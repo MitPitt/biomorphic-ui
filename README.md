@@ -1,25 +1,22 @@
 # Biomorphic UI
 
-Hand-engineered growth rules that *look* biological, rendered as borders and
+Hand-engineered growth rules that look biological, rendered as borders and
 frames on ordinary DOM elements.
 
 The idea: a web UI is made of boxes, and a box is really just a frame. Instead of
 styling that frame with a static `border`, this library grows it — with cellular
 automata and agent simulations that read as plausible organic matter (spikes,
-trees, fluid) while still respecting the box's geometry. Growth is seeded from an
-element's edges, blocked by its neighbours, and it settles into a stable shape
-instead of running forever.
+trees, goo fluid) while still respecting the box's geometry. 
 
-It is deliberately **not** a scientific simulator. Each rule is tuned to look
-good on UI-scale rectangles at 60fps.
+Each rule is tuned to look good on UI-scale rectangles at 60fps.
 
 ## The three rule families
 
-| Material | What it is | How it runs |
-| --- | --- | --- |
-| **spikes** | A reach-field CA: stalagmite/cone tissue grown outward from the substrate rim. | WebGL2 fragment shader |
-| **tree** | Space colonization (Runions): roots anchor on edges, limbs reach for attractors, optional fern-like leaves. | live CPU |
-| **goo** | A position-based particle fluid that pools, drips and clings to edges. | live WebGPU (wasm fallback) |
+| Material | What it is                                                                                                  | How it runs                 |
+| -------- | ----------------------------------------------------------------------------------------------------------- | --------------------------- |
+| spikes   | A reach-field CA: stalagmite/cone tissue grown outward from the substrate rim.                              | WebGL2 fragment shader      |
+| tree     | Space colonization (Runions): roots anchor on edges, limbs reach for attractors, optional fern-like leaves. | live CPU                    |
+| goo      | A position-based particle fluid that pools, drips and clings to edges.                                      | live WebGPU (wasm fallback) |
 
 Pick one material per page; each page's elements share that material.
 
@@ -29,12 +26,12 @@ An npm-workspaces monorepo. Packages ship raw TypeScript source and are aliased
 straight to `src/` (no package build step), so consume them through a
 TS-capable bundler (Vite, esbuild, Astro) and add matching path aliases.
 
-| Package | Contents |
-| --- | --- |
-| `@biomorphic/ca-core` | Engine, runtime (`createBio`), shapes, fields, GLSL, types. No materials. |
-| `@biomorphic/ca-flora` | `spikes` + `tree` (substrate growth, no wasm/GPU). |
-| `@biomorphic/ca-goo` | `goo` (WGSL + wasm + `crates/goo`). |
-| `src/` | The Astro demo app — one page per material. |
+| Package                | Contents                                                                  |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `@biomorphic/ca-core`  | Engine, runtime (`createBio`), shapes, fields, GLSL, types. No materials. |
+| `@biomorphic/ca-flora` | `spikes` + `tree` (substrate growth, no wasm/GPU).                        |
+| `@biomorphic/ca-goo`   | `goo` (WGSL + wasm + `crates/goo`).                                       |
+| `src/`                 | The Astro demo app — one page per material.                               |
 
 ## Quick start (this repo)
 
@@ -91,27 +88,19 @@ element into coupling (default is one group per element), and `data-bio-mode` is
 ## Plan / status
 
 Shipped and working: spikes, tree, goo, the shared engine + runtime, substrate
-modes, neighbour collision, reflow isolation, and the demo app. It is rough but
-usable as a package for existing apps — the demo is a harness, not the product.
+modes, neighbour collision, reflow isolation, and the demo app.
 
-Next up (design notes): **generative frame shapes** — replacing "a box with
-growth on it" with frames that are *themselves* grown:
+Next up (design notes): generative frame shapes:
 
-- **Markov-chain frame shapes.** Learn the chaining of frame segments and corners
+- Markov-chain frame shapes. Learn the chaining of frame segments and corners
   from a dump of SVG frames, then walk a Markov chain to emit new border
   topologies (corner → segment → corner …). Turns a rectangle into a family of
   plausible frame silhouettes.
-- **Bézier path frames.** Place anchors at the outer corners of the furthest
+- Bézier path frames. Place anchors at the outer corners of the furthest
   text boxes and fit a smooth path through them — giving sleek, curvy enclosing
   shapes (the old-mobile-phone silhouette) instead of axis-aligned rectangles.
 
-Both are expected to arrive *later*; the current build ships as-is.
-
 ## Install
-
-Repo: **https://github.com/MitPitt/biomorphic-ui**
-
-Install straight from GitHub — no npm account, no registry:
 
 ```bash
 npm i github:MitPitt/biomorphic-ui
@@ -126,19 +115,6 @@ import { createBio } from '@biomorphic/ca-core';
 import { materials as flora } from '@biomorphic/ca-flora';
 import { materials as goo } from '@biomorphic/ca-goo';
 ```
-
-Notes:
-
-- The packages ship **raw TypeScript source**, so use a TS-capable bundler
-  (Vite, esbuild, Astro) — there is no build step or extra dependency for you.
-- Only three small packages are installed; the demo/dev tooling (`astro`,
-  `typescript`, `@webgpu/types`) lives in `devDependencies` and is skipped.
-- Pin a revision/tag with `npm i github:MitPitt/biomorphic-ui#<sha-or-tag>`.
-- Prefer SSH? `npm i git+ssh://git@github.com/MitPitt/biomorphic-ui.git`.
-- The goo wasm is committed (`packages/ca-goo/src/goo.wasm`), so Rust / `npm run
-  wasm` is only needed if you change the crate.
-
-Then see *Using it in your app* above.
 
 ## Layout
 
