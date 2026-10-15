@@ -1,5 +1,5 @@
-import { DIRS, normalField, T, wrapFragment } from '@bio/ca-core';
-import type { Material, SeedCtx } from '@bio/ca-core';
+import { DIRS, normalField, T, wrapFragment } from '@biomorphic/ca-core';
+import type { Material, SeedCtx } from '@biomorphic/ca-core';
 import { reachOffsetsGLSL, SNAP_DIRS_GLSL } from './reach';
 
 /**

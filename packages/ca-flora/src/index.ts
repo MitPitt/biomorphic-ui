@@ -1,10 +1,10 @@
 /**
- * @bio/ca-flora — the growth-from-substrate material family: `spikes` (a shader
+ * @biomorphic/ca-flora — the growth-from-substrate material family: `spikes` (a shader
  * reach-field CA) and `tree` (live space colonization). No wasm / GPU compute;
- * runs on the shared WebGL2 engine from `@bio/ca-core`.
+ * runs on the shared WebGL2 engine from `@biomorphic/ca-core`.
  */
 
-import type { Material, MaterialRegistry } from '@bio/ca-core';
+import type { Material, MaterialRegistry } from '@biomorphic/ca-core';
 import { spikes } from './spikes';
 import { tree } from './tree';
 

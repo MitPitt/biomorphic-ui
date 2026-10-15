@@ -10,9 +10,9 @@ export default defineConfig({
 	vite: {
 		resolve: {
 			alias: {
-				'@bio/ca-core': alias('./packages/ca-core/src/index.ts'),
-				'@bio/ca-flora': alias('./packages/ca-flora/src/index.ts'),
-				'@bio/ca-goo': alias('./packages/ca-goo/src/index.ts'),
+				'@biomorphic/ca-core': alias('./packages/ca-core/src/index.ts'),
+				'@biomorphic/ca-flora': alias('./packages/ca-flora/src/index.ts'),
+				'@biomorphic/ca-goo': alias('./packages/ca-goo/src/index.ts'),
 			},
 		},
 	},

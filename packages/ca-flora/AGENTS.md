@@ -1,7 +1,7 @@
-# AGENTS.md — @bio/ca-flora
+# AGENTS.md — @biomorphic/ca-flora
 
 > Spikes + tree: substrate growth on the shared WebGL2 engine, no wasm/GPU.
-> Depends only on `@bio/ca-core`. Shared engine/runtime/reflow notes live in the
+> Depends only on `@biomorphic/ca-core`. Shared engine/runtime/reflow notes live in the
 > root AGENTS.md and `packages/ca-core/`.
 
 ## Learnings / decisions

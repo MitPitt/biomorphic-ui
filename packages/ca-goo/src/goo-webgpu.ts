@@ -1,5 +1,5 @@
 import WGSL from './goo.wgsl?raw';
-import type { LiveHandle, LivePatch, SeedCtx } from '@bio/ca-core';
+import type { LiveHandle, LivePatch, SeedCtx } from '@biomorphic/ca-core';
 
 /**
  * GOO — WebGPU compute backend.

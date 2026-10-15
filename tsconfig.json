@@ -2,9 +2,9 @@
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
     "paths": {
-      "@bio/ca-core": ["./packages/ca-core/src/index.ts"],
-      "@bio/ca-flora": ["./packages/ca-flora/src/index.ts"],
-      "@bio/ca-goo": ["./packages/ca-goo/src/index.ts"]
+      "@biomorphic/ca-core": ["./packages/ca-core/src/index.ts"],
+      "@biomorphic/ca-flora": ["./packages/ca-flora/src/index.ts"],
+      "@biomorphic/ca-goo": ["./packages/ca-goo/src/index.ts"]
     }
   },
   "include": [".astro/types.d.ts", "**/*"],

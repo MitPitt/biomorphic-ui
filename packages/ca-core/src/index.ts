@@ -1,7 +1,7 @@
 /**
- * @bio/ca-core — the shared kernel: the WebGL2 engine, the framework-agnostic
+ * @biomorphic/ca-core — the shared kernel: the WebGL2 engine, the framework-agnostic
  * runtime (`createBio`), substrate shapes, distance/normal fields, GLSL helpers
- * and the shared types. Material families (`@bio/ca-flora`, `@bio/ca-goo`) depend
+ * and the shared types. Material families (`@biomorphic/ca-flora`, `@biomorphic/ca-goo`) depend
  * on this and are composed by the app into the registry `createBio` takes.
  */
 

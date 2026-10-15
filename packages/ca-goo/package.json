@@ -1,5 +1,5 @@
 {
-  "name": "@bio/ca-goo",
+  "name": "@biomorphic/ca-goo",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -11,6 +11,6 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@bio/ca-core": "file:../ca-core"
+    "@biomorphic/ca-core": "file:../ca-core"
   }
 }

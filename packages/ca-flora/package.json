@@ -1,5 +1,5 @@
 {
-  "name": "@bio/ca-flora",
+  "name": "@biomorphic/ca-flora",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -10,6 +10,6 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@bio/ca-core": "file:../ca-core"
+    "@biomorphic/ca-core": "file:../ca-core"
   }
 }

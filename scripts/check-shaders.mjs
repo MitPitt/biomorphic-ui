@@ -3,7 +3,7 @@
 //   2. a declared uniform with no matching param    -> silently stays 0
 // (1) fails the check (and the build); (2) only warns.
 //
-// Mirrors the runtime guard in @bio/ca-core glsl.ts (checkUniforms) so mistakes are
+// Mirrors the runtime guard in @biomorphic/ca-core glsl.ts (checkUniforms) so mistakes are
 // caught before shipping. Scans every material family's src/ dir. Run via
 // `npm run check` (also part of `npm run build`).
 import { readFileSync, readdirSync } from 'node:fs';

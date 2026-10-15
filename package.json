@@ -19,9 +19,9 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@bio/ca-core": "file:packages/ca-core",
-    "@bio/ca-flora": "file:packages/ca-flora",
-    "@bio/ca-goo": "file:packages/ca-goo"
+    "@biomorphic/ca-core": "file:packages/ca-core",
+    "@biomorphic/ca-flora": "file:packages/ca-flora",
+    "@biomorphic/ca-goo": "file:packages/ca-goo"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.74",

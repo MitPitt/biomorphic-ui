@@ -3,13 +3,13 @@
 Biomorphic UI: hand-engineered growth rules that look biological, rendered as
 borders/growth on DOM elements (Astro + WebGL2). An npm-workspaces monorepo:
 
-- `packages/ca-core` (`@bio/ca-core`) — the shared kernel: engine, runtime, shapes,
+- `packages/ca-core` (`@biomorphic/ca-core`) — the shared kernel: engine, runtime, shapes,
   fields, glsl, types. No materials.
-- `packages/ca-flora` (`@bio/ca-flora`) — spikes + tree (substrate growth, no wasm/GPU).
-- `packages/ca-goo` (`@bio/ca-goo`) — the fluid (wgsl + wasm + `packages/ca-goo/crates/goo`).
+- `packages/ca-flora` (`@biomorphic/ca-flora`) — spikes + tree (substrate growth, no wasm/GPU).
+- `packages/ca-goo` (`@biomorphic/ca-goo`) — the fluid (wgsl + wasm + `packages/ca-goo/crates/goo`).
 - `src/` — the one Astro demo app; `src/materials.ts` composes the registry the
   runtime takes (`createBio({ materials })`). Vite aliases + tsconfig `paths` point
-  `@bio/*` at each package's TS source (no package build step).
+  `@biomorphic/*` at each package's TS source (no package build step).
 
 ## Architecture
 

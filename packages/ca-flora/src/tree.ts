@@ -1,5 +1,5 @@
-import { DIRS, distanceField, normalField, wrapFragment } from '@bio/ca-core';
-import type { LivePatch, Material, SeedCtx } from '@bio/ca-core';
+import { DIRS, distanceField, normalField, wrapFragment } from '@biomorphic/ca-core';
+import type { LivePatch, Material, SeedCtx } from '@biomorphic/ca-core';
 import { REACH_OFFSETS, snapDirs } from './reach';
 
 /**

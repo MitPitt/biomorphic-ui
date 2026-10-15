@@ -31,9 +31,9 @@ TS-capable bundler (Vite, esbuild, Astro) and add matching path aliases.
 
 | Package | Contents |
 | --- | --- |
-| `@bio/ca-core` | Engine, runtime (`createBio`), shapes, fields, GLSL, types. No materials. |
-| `@bio/ca-flora` | `spikes` + `tree` (substrate growth, no wasm/GPU). |
-| `@bio/ca-goo` | `goo` (WGSL + wasm + `crates/goo`). |
+| `@biomorphic/ca-core` | Engine, runtime (`createBio`), shapes, fields, GLSL, types. No materials. |
+| `@biomorphic/ca-flora` | `spikes` + `tree` (substrate growth, no wasm/GPU). |
+| `@biomorphic/ca-goo` | `goo` (WGSL + wasm + `crates/goo`). |
 | `src/` | The Astro demo app — one page per material. |
 
 ## Quick start (this repo)
@@ -56,9 +56,9 @@ npm run wasm       # rebuild the goo wasm crate (needs Rust)
 ```
 
 ```ts
-import { createBio } from '@bio/ca-core';
-import { materials as flora } from '@bio/ca-flora';
-import { materials as goo } from '@bio/ca-goo';
+import { createBio } from '@biomorphic/ca-core';
+import { materials as flora } from '@biomorphic/ca-flora';
+import { materials as goo } from '@biomorphic/ca-goo';
 
 const bio = createBio({
   materials: { ...flora, ...goo },  // compose the families you ship
@@ -118,13 +118,13 @@ npm i github:MitPitt/biomorphic-ui
 ```
 
 That pulls the repo and its three packages, which are wired together as `file:`
-links inside the repo (`@bio/ca-core`, `@bio/ca-flora`, `@bio/ca-goo`). Then
+links inside the repo (`@biomorphic/ca-core`, `@biomorphic/ca-flora`, `@biomorphic/ca-goo`). Then
 import them as usual:
 
 ```ts
-import { createBio } from '@bio/ca-core';
-import { materials as flora } from '@bio/ca-flora';
-import { materials as goo } from '@bio/ca-goo';
+import { createBio } from '@biomorphic/ca-core';
+import { materials as flora } from '@biomorphic/ca-flora';
+import { materials as goo } from '@biomorphic/ca-goo';
 ```
 
 Notes:

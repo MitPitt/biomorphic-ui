@@ -1,5 +1,5 @@
-import { wrapFragment } from '@bio/ca-core';
-import type { LiveHandle, LivePatch, Material, SeedCtx } from '@bio/ca-core';
+import { wrapFragment } from '@biomorphic/ca-core';
+import type { LiveHandle, LivePatch, Material, SeedCtx } from '@biomorphic/ca-core';
 import { WebGpuGoo } from './goo-webgpu';
 import wasmUrl from './goo.wasm?url';
 

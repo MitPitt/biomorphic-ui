@@ -1,7 +1,7 @@
-# AGENTS.md — @bio/ca-goo
+# AGENTS.md — @biomorphic/ca-goo
 
 > The liquid family: one position-based fluid, WebGPU compute backend with a
-> wasm fallback. Depends only on `@bio/ca-core`. Only emit-related details are
+> wasm fallback. Depends only on `@biomorphic/ca-core`. Only emit-related details are
 > here; the shared engine/runtime live in the root AGENTS.md and
 > `packages/ca-core/`.
 

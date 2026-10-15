@@ -1,5 +1,5 @@
-import { createBio } from "@bio/ca-core";
-import type { ActivityMode, ParamDef } from "@bio/ca-core";
+import { createBio } from "@biomorphic/ca-core";
+import type { ActivityMode, ParamDef } from "@biomorphic/ca-core";
 import { materials } from "../materials";
 
 /**
