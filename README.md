@@ -116,6 +116,15 @@ import { materials as flora } from '@biomorphic/ca-flora';
 import { materials as goo } from '@biomorphic/ca-goo';
 ```
 
+### Pin a revision
+
+This project is still evolving and may introduce breaking changes, so pin an
+exact revision and bump it deliberately:
+
+```bash
+npm i github:MitPitt/biomorphic-ui#<commit-sha>
+```
+
 ## Layout
 
 ```
