@@ -19,13 +19,13 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@bio/ca-core": "*",
-    "@bio/ca-flora": "*",
-    "@bio/ca-goo": "*",
-    "astro": "^7.3.8"
+    "@bio/ca-core": "file:packages/ca-core",
+    "@bio/ca-flora": "file:packages/ca-flora",
+    "@bio/ca-goo": "file:packages/ca-goo"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.74",
+    "astro": "^7.3.8",
     "typescript": "^7.0.2"
   }
 }

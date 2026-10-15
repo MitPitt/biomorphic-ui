@@ -107,23 +107,38 @@ growth on it" with frames that are *themselves* grown:
 
 Both are expected to arrive *later*; the current build ships as-is.
 
-## Hosting & publishing
+## Install
 
-Yes — GitHub covers both halves, and they are complementary:
+Repo: **https://github.com/MitPitt/biomorphic-ui**
 
-- **Code**: push the repo to GitHub as normal (public or private).
-- **Package**: GitHub does not serve an npm registry from your repo, so publish
-  the packages separately:
-  - **npm** (public) — the usual route: `npm publish` from each workspace.
-    Note the packages currently export raw `.ts` (`"exports": "./src/index.ts"`),
-    so before publishing you'd add a compile step (emit `.js` + `.d.ts`) and
-    point `exports`/`types` at the build output, or publish to a private registry
-    and keep alias-consuming through a TS bundler.
-  - **GitHub Packages** — publish to GitHub's npm registry instead (set
-    `publishConfig.registry` to `https://npm.pkg.github.com`), which keeps code
-    and packages under one account.
-  - Alternatively, **install straight from git**: `npm i github:you/biomorphic-ui`
-    or a workspace/submodule, if you don't want to publish at all.
+Install straight from GitHub — no npm account, no registry:
+
+```bash
+npm i github:MitPitt/biomorphic-ui
+```
+
+That pulls the repo and its three packages, which are wired together as `file:`
+links inside the repo (`@bio/ca-core`, `@bio/ca-flora`, `@bio/ca-goo`). Then
+import them as usual:
+
+```ts
+import { createBio } from '@bio/ca-core';
+import { materials as flora } from '@bio/ca-flora';
+import { materials as goo } from '@bio/ca-goo';
+```
+
+Notes:
+
+- The packages ship **raw TypeScript source**, so use a TS-capable bundler
+  (Vite, esbuild, Astro) — there is no build step or extra dependency for you.
+- Only three small packages are installed; the demo/dev tooling (`astro`,
+  `typescript`, `@webgpu/types`) lives in `devDependencies` and is skipped.
+- Pin a revision/tag with `npm i github:MitPitt/biomorphic-ui#<sha-or-tag>`.
+- Prefer SSH? `npm i git+ssh://git@github.com/MitPitt/biomorphic-ui.git`.
+- The goo wasm is committed (`packages/ca-goo/src/goo.wasm`), so Rust / `npm run
+  wasm` is only needed if you change the crate.
+
+Then see *Using it in your app* above.
 
 ## Layout
 

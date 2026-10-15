@@ -11,6 +11,6 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@bio/ca-core": "*"
+    "@bio/ca-core": "file:../ca-core"
   }
 }
