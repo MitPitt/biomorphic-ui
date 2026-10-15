@@ -1,0 +1,81 @@
+---
+import BioDemo from "../layouts/BioDemo.astro";
+---
+
+<BioDemo
+	title="biomorphic ui — spikes"
+	material="spikes"
+	toggleStates="active,wall"
+	toggleLabels="grow spikes|clear spikes"
+>
+	<h1>spikes</h1>
+	<p class="lead">
+		A reach-field CA grown onto frozen substrate cells. Each box is its
+		own group; neighbours block but never seed each other.
+	</p>
+
+	<section class="card sub" data-bio-group="card">
+		<h2>Substrate card</h2>
+		<p>
+			This box is a region of immutable cells. The spikes take root on its
+			perimeter and grow outward, stopping at the next box.
+		</p>
+	</section>
+
+	<section class="card sub tall" data-bio-group="crevice">
+		<h2>Crevice partner</h2>
+		<p>
+			The gap between these two boxes is a constrained channel — spikes
+			from both sides meet in the middle.
+		</p>
+	</section>
+
+	<div class="shapes">
+		<div class="sub shape circle" data-bio-group="shapes" data-shape="circle">
+			<span>circle</span>
+		</div>
+		<div
+			class="sub shape star"
+			data-bio-group="shapes"
+			data-shape="star"
+			data-points="5"
+		>
+			<span>star</span>
+		</div>
+		<div
+			class="sub shape hex"
+			data-bio-group="shapes"
+			data-shape="polygon"
+			data-sides="6"
+		>
+			<span>hexagon</span>
+		</div>
+	</div>
+
+	<details class="reflow">
+		<summary>group-relative reflow</summary>
+		<div class="reflow-body">
+			<p>
+				Every box here is its own group. Opening this panel grows the gap and
+				slides the toggle below down as one piece. Once a group has settled,
+				moving it just <em>translates</em> the finished shape — a jigsaw piece
+				— instead of re-growing it, so neither counter moves.
+			</p>
+			<div class="status">
+				re-seeds — shapes: <b data-reseed="shapes">0</b> · toggle:
+				<b data-reseed="toggle">0</b>
+			</div>
+		</div>
+	</details>
+
+	<div class="row">
+		<button
+			class="btn sub"
+			id="growthBtn"
+			data-bio-group="toggle"
+			data-bio-mode="active"
+		>
+			grow spikes
+		</button>
+	</div>
+</BioDemo>

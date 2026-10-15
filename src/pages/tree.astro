@@ -1,0 +1,75 @@
+---
+import BioDemo from "../layouts/BioDemo.astro";
+---
+
+<BioDemo
+	title="biomorphic ui — tree"
+	material="tree"
+	toggleStates="active,wall"
+	toggleLabels="grow tree|clear tree"
+>
+	<h1>tree</h1>
+	<p class="lead">
+		Live space colonization (Runions): roots anchor on the box rim and
+		branches grow toward scattered light. Separate trees share one tissue
+		map plus a small cross-group <em>aura</em>, so neighbouring branches
+		leave a crown-shyness gap instead of touching.
+	</p>
+
+	<section class="card sub" data-bio-group="card">
+		<h2>Root box</h2>
+		<p>
+			Each element is its own tree. Branches thicken over time (da Vinci)
+			and stop at a neighbour's box or branches.
+		</p>
+	</section>
+
+	<div class="shapes">
+		<div class="sub shape circle" data-bio-group="shapes" data-shape="circle">
+			<span>circle</span>
+		</div>
+		<div
+			class="sub shape star"
+			data-bio-group="shapes"
+			data-shape="star"
+			data-points="5"
+		>
+			<span>star</span>
+		</div>
+		<div
+			class="sub shape hex"
+			data-bio-group="shapes"
+			data-shape="polygon"
+			data-sides="6"
+		>
+			<span>hexagon</span>
+		</div>
+	</div>
+
+	<details class="reflow">
+		<summary>group-relative reflow</summary>
+		<div class="reflow-body">
+			<p>
+				Each box is its own group. Opening this panel grows the gap and
+				slides the toggle below down as one piece. Once a group has settled,
+				moving it just <em>translates</em> the finished shape — a jigsaw piece
+				— instead of re-growing it, so neither counter moves.
+			</p>
+			<div class="status">
+				re-seeds — shapes: <b data-reseed="shapes">0</b> · toggle:
+				<b data-reseed="toggle">0</b>
+			</div>
+		</div>
+	</details>
+
+	<div class="row">
+		<button
+			class="btn sub"
+			id="growthBtn"
+			data-bio-group="toggle"
+			data-bio-mode="active"
+		>
+			grow tree
+		</button>
+	</div>
+</BioDemo>

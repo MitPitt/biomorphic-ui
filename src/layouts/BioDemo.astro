@@ -1,0 +1,98 @@
+---
+import "../styles/demo.css";
+
+interface Props {
+	title: string;
+	material: string;
+	/** Comma-separated ActivityModes the toggle cycles, e.g. "active,wall" or "active,emitter,wall". */
+	toggleStates?: string;
+	/** Pipe-separated labels for those states, e.g. "grow spikes|clear". */
+	toggleLabels?: string;
+}
+
+const {
+	title,
+	material,
+	toggleStates = "active,wall",
+	toggleLabels = "",
+} = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+	</head>
+	<body
+		data-bio-material={material}
+		data-toggle-states={toggleStates}
+		data-toggle-labels={toggleLabels}
+	>
+		<main>
+			<nav class="pages">
+				<a href="/" aria-current={material === "spikes" ? "page" : undefined}
+					>spikes</a
+				>
+				<a href="/tree" aria-current={material === "tree" ? "page" : undefined}
+					>tree</a
+				>
+				<a href="/goo" aria-current={material === "goo" ? "page" : undefined}
+					>goo</a
+				>
+			</nav>
+			<slot />
+		</main>
+
+		<aside id="panel">
+			<h3>controls</h3>
+			<div class="btns">
+				<button id="play">pause</button>
+				<button id="step">step</button>
+				<button id="reset">reset</button>
+			</div>
+			<hr />
+			<label class="ctrl global"
+				><span>speed <b id="speed-v"></b></span><input
+					id="speed"
+					type="range"
+					min="1"
+					max="32"
+					step="1"
+				/></label
+			>
+			{
+				material !== "goo" && (
+					<label class="check">
+						<span>instant (skip to settled)</span>
+						<input id="instant" type="checkbox" />
+					</label>
+				)
+			}
+			<label class="ctrl global"
+				><span>cell size (all rules) <b id="cell-v"></b></span><input
+					id="cell"
+					type="range"
+					min="0"
+					max="1000"
+					step="1"
+				/></label
+			>
+			<hr />
+			<div id="legend">
+				<span class="k-global">global</span>
+				<span class="k-structure">structure</span>
+				<span class="k-cells">cells</span>
+				<span class="k-look">look</span>
+			</div>
+			<div id="params"></div>
+		</aside>
+
+		<script>
+			import { startDemo } from "../lib/demo";
+			startDemo();
+		</script>
+	</body>
+</html>

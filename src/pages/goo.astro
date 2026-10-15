@@ -1,0 +1,66 @@
+---
+import BioDemo from "../layouts/BioDemo.astro";
+---
+
+<BioDemo
+	title="biomorphic ui — goo"
+	material="goo"
+	toggleStates="active,emitter,wall"
+	toggleLabels="source + wall|emitter only|wall only"
+>
+	<h1>goo</h1>
+	<p class="lead">
+		A single position-based fluid (WebGPU compute, wasm fallback). Goo is
+		<em>coupled</em>: every element on the page is one field, so the toggle
+		changes a mode without ever restarting the fluid.
+	</p>
+
+	<section class="card sub" data-bio-mode="emitter">
+		<h2>Emitter</h2>
+		<p>
+			An <b>emitter</b> is a source that does not block — goo spawns on its
+			rim and falls straight through it. Switch it to <b>wall only</b> and
+			it becomes a solid obstacle instead.
+		</p>
+	</section>
+
+	<div class="row">
+		<button
+			class="btn sub"
+			id="growthBtn"
+			data-bio-mode="emitter"
+		>
+			emitter only
+		</button>
+	</div>
+
+	<section class="card sub tall" data-bio-mode="wall">
+		<h2>Basin</h2>
+		<p>
+			A <b>wall</b> blocks and collides but emits nothing, so the fluid
+			pools in it.
+		</p>
+	</section>
+
+	<div class="shapes">
+		<div class="sub shape circle" data-bio-mode="active" data-shape="circle">
+			<span>circle</span>
+		</div>
+		<div
+			class="sub shape star"
+			data-bio-mode="active"
+			data-shape="star"
+			data-points="5"
+		>
+			<span>star</span>
+		</div>
+		<div
+			class="sub shape hex"
+			data-bio-mode="wall"
+			data-shape="polygon"
+			data-sides="6"
+		>
+			<span>hexagon</span>
+		</div>
+	</div>
+</BioDemo>

@@ -1,0 +1,249 @@
+---
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>biomorphic ui — reflow</title>
+		<style is:global>
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+			}
+			body {
+				background: #050506;
+				color: #e9e9ec;
+				font:
+					14px/1.6 ui-monospace,
+					"SF Mono",
+					Menlo,
+					monospace;
+				overflow-x: hidden;
+			}
+			main {
+				position: relative;
+				z-index: 1;
+				max-width: 760px;
+				margin: 0 auto;
+				padding: 48px 24px 240px;
+			}
+			h1 {
+				font-size: 18px;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				font-weight: 500;
+				margin: 0 0 4px;
+			}
+			p.lead {
+				color: #8a8f96;
+				margin: 0 0 32px;
+			}
+			h2 {
+				font-size: 12px;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				color: #8a8f96;
+				margin: 40px 0 10px;
+			}
+			.cols {
+				display: flex;
+				gap: 28px;
+				align-items: flex-start;
+			}
+			.col {
+				flex: 1;
+			}
+			.box {
+				border-radius: 10px;
+				padding: 18px;
+				color: #cfd3da;
+				min-height: 72px;
+			}
+			.spacer {
+				height: 16px;
+				transition: height 0.2s ease;
+			}
+			textarea {
+				width: 100%;
+				min-height: 60px;
+				background: #0d0e11;
+				color: #e9e9ec;
+				border: 1px solid #202327;
+				border-radius: 8px;
+				padding: 8px;
+				font: inherit;
+				resize: vertical;
+			}
+			button {
+				background: #14161a;
+				color: #e9e9ec;
+				border: 1px solid #202327;
+				border-radius: 7px;
+				padding: 7px 10px;
+				font: inherit;
+				cursor: pointer;
+				margin: 0 6px 8px 0;
+			}
+			.status {
+				color: #8a8f96;
+				font-size: 12px;
+				margin-top: 10px;
+			}
+			.status b {
+				color: #a6d18c;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>reflow cases</h1>
+			<p class="lead">
+				Each framed box is a biomorphic group. Only a group whose own
+				rect moves is rebuilt — everything else keeps its grown shape.
+			</p>
+
+			<h2>1 — isolated groups (independent reflow)</h2>
+			<div class="cols">
+				<div class="col">
+					<textarea id="grower" rows="3">
+content above the left box. grow me and the box below is pushed down.</textarea
+					>
+					<div
+						class="box bio"
+						id="leftBox"
+						data-bio="spikes"
+						data-bio-group="left"
+						data-bio-mode="active"
+					>
+						left · group "left"
+					</div>
+				</div>
+				<div class="col">
+					<div
+						class="box bio"
+						id="rightBox"
+						data-bio="tree"
+						data-bio-group="right"
+						data-bio-mode="active"
+					>
+						right · group "right"
+					</div>
+				</div>
+			</div>
+			<button id="growAbove">grow text above left</button>
+			<button id="resizeLeft">resize left box</button>
+			<div class="status">
+				re-seeds — left: <b id="c-left">0</b> · right:
+				<b id="c-right">0</b>
+			</div>
+
+			<h2>2 — coupled group (one grid, shared reflow)</h2>
+			<p class="lead">
+				These two boxes share group "pair": their growth is one field, so
+				resizing either rebuilds both.
+			</p>
+			<div class="cols">
+				<div
+					class="box bio"
+					id="pairA"
+					data-bio="spikes"
+					data-bio-group="pair"
+					data-bio-mode="active"
+				>
+					pair A
+				</div>
+				<div
+					class="box bio"
+					id="pairB"
+					data-bio="spikes"
+					data-bio-group="pair"
+					data-bio-mode="active"
+				>
+					pair B
+				</div>
+			</div>
+			<button id="resizePair">resize pair A</button>
+			<div class="status">
+				re-seeds — pair: <b id="c-pair">0</b>
+			</div>
+
+			<h2>3 — independent groups, one mass (mutual obstacles)</h2>
+			<p class="lead">
+				Two separate tree groups (no shared <code>data-bio-group</code>). Beyond
+				seeing each other's boxes, they share one live-tissue map, so their
+				branches meet at the neighbour instead of crossing. Growing the gap
+				rebuilds only the group that moved; the other keeps its shape.
+			</p>
+			<div class="box bio" id="massA" data-bio="tree" data-bio-group="massA" data-bio-mode="active">
+				mass A · tree · group "massA"
+			</div>
+			<div class="spacer" id="massGap"></div>
+			<div class="box bio" id="massB" data-bio="tree" data-bio-group="massB" data-bio-mode="active">
+				mass B · tree · group "massB"
+			</div>
+			<button id="growGap">grow gap (push B down)</button>
+			<button id="resetAll">reset all groups</button>
+			<div class="status">
+				re-seeds — massA: <b id="c-massA">0</b> · massB:
+				<b id="c-massB">0</b>
+			</div>
+		</main>
+
+		<script>
+			import { createBio } from "@bio/ca-core";
+			import { materials } from "../materials";
+
+			const bio = createBio({ materials, material: "spikes" });
+			bio.scan();
+
+			// count resets per group so the isolation is visible, not just claimed
+			const counts: Record<string, number> = {};
+			const els: Record<string, HTMLElement | null> = {
+				left: document.getElementById("c-left"),
+				right: document.getElementById("c-right"),
+				pair: document.getElementById("c-pair"),
+				massA: document.getElementById("c-massA"),
+				massB: document.getElementById("c-massB"),
+			};
+			const bump = (g: string) => {
+				counts[g] = (counts[g] ?? 0) + 1;
+				if (els[g]) els[g]!.textContent = String(counts[g]);
+			};
+			for (const g of bio.groups()) {
+				const e = bio.engine(g)!;
+				const orig = e.reset.bind(e);
+				e.reset = () => {
+					bump(g);
+					orig();
+				};
+			}
+
+			const grower = document.getElementById("grower") as HTMLTextAreaElement;
+			document.getElementById("growAbove")!.addEventListener("click", () => {
+				grower.rows += 2;
+			});
+
+			const leftBox = document.getElementById("leftBox") as HTMLElement;
+			document.getElementById("resizeLeft")!.addEventListener("click", () => {
+				leftBox.style.padding = leftBox.style.padding === "48px" ? "18px" : "48px";
+			});
+
+			const pairA = document.getElementById("pairA") as HTMLElement;
+			document.getElementById("resizePair")!.addEventListener("click", () => {
+				pairA.style.padding = pairA.style.padding === "48px" ? "18px" : "48px";
+			});
+
+			// changing the gap translates B (it reseeds) but leaves A's rect alone,
+			// so A keeps its grown shape despite seeing B as an obstacle.
+			const gap = document.getElementById("massGap") as HTMLElement;
+			document.getElementById("growGap")!.addEventListener("click", () => {
+				gap.style.height = gap.style.height === "120px" ? "16px" : "120px";
+			});
+			document.getElementById("resetAll")!.addEventListener("click", () => bio.reset());
+		</script>
+	</body>
+</html>

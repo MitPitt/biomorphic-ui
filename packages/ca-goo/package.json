@@ -1,0 +1,16 @@
+{
+  "name": "@bio/ca-goo",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "crates"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@bio/ca-core": "*"
+  }
+}

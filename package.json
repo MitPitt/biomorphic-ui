@@ -1,0 +1,31 @@
+{
+  "name": "biomorphic-ui",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/check-shaders.mjs && astro build",
+    "check": "node scripts/check-shaders.mjs",
+    "check:wgsl": "node scripts/check-wgsl.mjs",
+    "wasm": "node scripts/build-wasm.mjs",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@bio/ca-core": "*",
+    "@bio/ca-flora": "*",
+    "@bio/ca-goo": "*",
+    "astro": "^7.3.8"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.74",
+    "typescript": "^7.0.2"
+  }
+}

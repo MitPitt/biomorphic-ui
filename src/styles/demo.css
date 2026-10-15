@@ -1,0 +1,328 @@
+:root {
+	--ink: #e9e9ec;
+	--dim: #8a8f96;
+	--box: transparent;
+	--line: #202327;
+}
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+}
+html {
+	background: #050506;
+}
+body {
+	background: #050506;
+	color: var(--ink);
+	font:
+		14px/1.6 ui-monospace,
+		"SF Mono",
+		Menlo,
+		monospace;
+	overflow-x: hidden;
+}
+main {
+	position: relative;
+	z-index: 1;
+	max-width: 640px;
+	margin: 0 auto;
+	padding: 96px 24px 160px;
+}
+h1 {
+	font-size: 22px;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	font-weight: 500;
+	margin: 0 0 6px;
+}
+.lead {
+	color: var(--dim);
+	margin: 0 0 40px;
+}
+.sub {
+	background: var(--box);
+	border-radius: 10px;
+	padding: 20px 22px;
+}
+.card h2 {
+	margin: 0 0 8px;
+	font-size: 15px;
+	font-weight: 600;
+}
+.card p {
+	margin: 0;
+	color: var(--dim);
+}
+.row {
+	display: flex;
+	gap: 12px;
+	margin-top: 40px;
+}
+.btn {
+	flex: 1;
+	background: var(--box);
+	border-radius: 10px;
+	padding: 16px;
+	color: var(--ink);
+	font: inherit;
+	cursor: pointer;
+}
+.btn:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+.chip {
+	display: inline-block;
+	margin-top: 40px;
+	padding: 8px 14px;
+	border-radius: 999px;
+	font-size: 12px;
+	letter-spacing: 0.1em;
+}
+.tall {
+	margin-top: 40px;
+}
+.shapes {
+	display: flex;
+	gap: 28px;
+	margin-top: 44px;
+	align-items: center;
+	justify-content: space-between;
+}
+.shape {
+	border: none;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--dim);
+	font-size: 11px;
+	letter-spacing: 0.1em;
+}
+.shape span {
+	pointer-events: none;
+}
+.circle {
+	width: 132px;
+	height: 132px;
+}
+.star {
+	width: 150px;
+	height: 150px;
+}
+.hex {
+	width: 150px;
+	height: 140px;
+}
+/* cross-page nav */
+.pages {
+	display: flex;
+	gap: 16px;
+	margin: 0 0 28px;
+	font-size: 11px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+.pages a {
+	color: var(--dim);
+	text-decoration: none;
+}
+.pages a[aria-current="page"] {
+	color: var(--ink);
+}
+/* group-relative-reflow details: expands in flow, so opening it grows the gap and
+   pushes the toggle below down (the circle/star/hex group above stays put) */
+.reflow {
+	margin-top: 36px;
+}
+.reflow > summary {
+	cursor: pointer;
+	list-style: none;
+	color: var(--dim);
+	font-size: 11px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+.reflow > summary::-webkit-details-marker {
+	display: none;
+}
+.reflow > summary::before {
+	content: "▸ ";
+	color: #5a6068;
+}
+.reflow[open] > summary::before {
+	content: "▾ ";
+}
+.reflow-body {
+	margin-top: 10px;
+	padding: 14px 16px;
+	background: rgba(10, 11, 13, 0.97);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+}
+.reflow-body p {
+	margin: 0 0 8px;
+	color: var(--dim);
+}
+.status {
+	color: var(--dim);
+	font-size: 12px;
+}
+.status b {
+	color: #a6d18c;
+}
+#panel {
+	position: fixed;
+	top: 16px;
+	right: 16px;
+	z-index: 3;
+	width: 248px;
+	padding: 14px;
+	background: rgba(10, 11, 13, 0.86);
+	backdrop-filter: blur(10px);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	font-size: 12px;
+}
+#panel h3 {
+	margin: 0 0 10px;
+	font-size: 11px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--dim);
+	font-weight: 600;
+}
+#panel button {
+	font: inherit;
+	color: var(--ink);
+	background: #14161a;
+	border: 1px solid var(--line);
+	border-radius: 7px;
+	padding: 6px 8px;
+	cursor: pointer;
+}
+.btns {
+	display: flex;
+	gap: 6px;
+	margin-bottom: 12px;
+}
+.btns button {
+	flex: 1;
+}
+.ctrl {
+	display: grid;
+	grid-template-columns: 1fr;
+	margin: 0 0 10px;
+}
+.ctrl span {
+	color: var(--dim);
+	display: flex;
+	justify-content: space-between;
+}
+.ctrl input[type="range"] {
+	width: 100%;
+	accent-color: #6fbf4a;
+}
+.ctrl.structure input[type="range"] {
+	accent-color: #5f9bff;
+}
+.ctrl.structure span {
+	color: #9dbcf0;
+}
+.ctrl.cells input[type="range"] {
+	accent-color: #6fbf4a;
+}
+.ctrl.cells span {
+	color: #a6d18c;
+}
+.ctrl.look input[type="range"] {
+	accent-color: #e0a94a;
+}
+.ctrl.look span {
+	color: #e3c48a;
+}
+.ctrl.global input[type="range"] {
+	accent-color: #8a8f96;
+}
+.ctrl.global span {
+	color: var(--dim);
+}
+.check {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin: 0 0 10px;
+	color: var(--dim);
+	font-size: 12px;
+	cursor: pointer;
+}
+.check input {
+	accent-color: #6fbf4a;
+}
+#panel details {
+	margin: 0 0 6px;
+	border-top: 1px solid var(--line);
+	padding-top: 4px;
+}
+#panel summary {
+	cursor: pointer;
+	list-style: none;
+	color: var(--dim);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	font-weight: 600;
+	padding: 4px 0;
+}
+#panel summary::-webkit-details-marker {
+	display: none;
+}
+#panel summary::before {
+	content: "▸ ";
+	color: #5a6068;
+}
+#panel details[open] > summary::before {
+	content: "▾ ";
+}
+#panel .group {
+	padding: 6px 0 2px;
+}
+#legend {
+	display: flex;
+	gap: 10px;
+	margin: 0 0 12px;
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+#legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--dim);
+}
+#legend span::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+}
+#legend .k-global::before {
+	background: #8a8f96;
+}
+#legend .k-structure::before {
+	background: #5f9bff;
+}
+#legend .k-cells::before {
+	background: #6fbf4a;
+}
+#legend .k-look::before {
+	background: #e0a94a;
+}
+hr {
+	border: 0;
+	border-top: 1px solid var(--line);
+	margin: 12px 0;
+}

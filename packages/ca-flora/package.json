@@ -1,0 +1,15 @@
+{
+  "name": "@bio/ca-flora",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@bio/ca-core": "*"
+  }
+}

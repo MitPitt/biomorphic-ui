@@ -1,0 +1,11 @@
+[package]
+name = "wgslcheck"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wgslcheck"
+path = "src/main.rs"
+
+[dependencies]
+naga = { version = "26", features = ["wgsl-in", "wgsl-out", "stderr"] }

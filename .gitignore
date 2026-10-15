@@ -1,0 +1,42 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# rust build output
+target/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# agent / tooling config
+.kilo/
+.kilocode/
+.opencode/
+
+# editor / OS cruft
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*~
+
+# caches / coverage
+.cache/
+coverage/
+*.tsbuildinfo
+
+# local overrides
+*.local
