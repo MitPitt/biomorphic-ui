@@ -10,6 +10,8 @@ trees, goo fluid) while still respecting the box's geometry.
 
 Each rule is tuned to look good on UI-scale rectangles at 60fps.
 
+See live demo at https://biomorphic.mitpit.com/
+
 ## The three rule families
 
 | Material | What it is                                                                                                  | How it runs                 |
