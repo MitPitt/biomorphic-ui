@@ -1,5 +1,6 @@
 ---
 import "../styles/demo.css";
+import Plausible from "../components/Plausible.astro";
 
 interface Props {
 	title: string;
@@ -23,8 +24,8 @@ const {
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
+		<Plausible />
 	</head>
 	<body
 		data-bio-material={material}
@@ -33,13 +34,19 @@ const {
 	>
 		<main>
 			<nav class="pages">
-				<a href="/" aria-current={material === "spikes" ? "page" : undefined}
+				<a
+					href="/"
+					aria-current={material === "spikes" ? "page" : undefined}
 					>spikes</a
 				>
-				<a href="/tree" aria-current={material === "tree" ? "page" : undefined}
+				<a
+					href="/tree"
+					aria-current={material === "tree" ? "page" : undefined}
 					>tree</a
 				>
-				<a href="/goo" aria-current={material === "goo" ? "page" : undefined}
+				<a
+					href="/goo"
+					aria-current={material === "goo" ? "page" : undefined}
 					>goo</a
 				>
 			</nav>
