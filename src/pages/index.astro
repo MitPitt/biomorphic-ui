@@ -52,18 +52,57 @@ import BioDemo from "../layouts/BioDemo.astro";
 		</div>
 	</div>
 
-	<details class="reflow">
+	<section class="card sub faq" data-bio-group="faq">
+		<h2>Self-resizing group</h2>
+		<p>
+			One group whose <em>own</em> rect changes. Opening a row below grows
+			this box, so the runtime re-rasterizes and re-grows the spikes around
+			the new perimeter — the faq counter ticks. Neighbours below only
+			translate.
+		</p>
+		<details>
+			<summary>Why does a resize rebuild?</summary>
+			<p>
+				The substrate grid was rasterized at the old height; every cell
+				must keep its coordinate, so the field is invalid until it is
+				rebuilt. Growth is deterministic, so the regrow is faithful.
+			</p>
+		</details>
+		<details>
+			<summary>Why doesn't a resize just translate?</summary>
+			<p>
+				A pure translation keeps every cell aligned, so a frozen frame can
+				slide as one piece. A height change moves the perimeter relative to
+				the cells, so the seed band itself changes.
+			</p>
+		</details>
+	</section>
+
+	<details
+		class="reflow"
+		data-bio-regrow-on="close"
+		data-bio-regrow-group="toggle"
+		data-bio-regrow-gate="regrowOnClose"
+	>
 		<summary>group-relative reflow</summary>
 		<div class="reflow-body">
 			<p>
-				Every box here is its own group. Opening this panel grows the gap and
-				slides the toggle below down as one piece. Once a group has settled,
-				moving it just <em>translates</em> the finished shape — a jigsaw piece
-				— instead of re-growing it, so neither counter moves.
+				Every box here is its own group. Opening this panel grows the gap
+				and slides the toggle below down as one piece. Once a group has
+				settled, moving it just <em>translates</em> the finished shape — a
+				jigsaw piece — instead of re-growing it. Closing this panel moves
+				the toggle back toward the shapes above; with <em>regrow on
+				close</em> ticked the toggle is rebuilt so its spikes re-fit the
+				new layout instead of sliding over the group above (its counter
+				then ticks).
 			</p>
+			<label class="check">
+				<span>regrow toggle on close</span>
+				<input id="regrowOnClose" type="checkbox" checked />
+			</label>
 			<div class="status">
 				re-seeds — shapes: <b data-reseed="shapes">0</b> · toggle:
-				<b data-reseed="toggle">0</b>
+				<b data-reseed="toggle">0</b> · faq: <b data-reseed="faq">0</b>
 			</div>
 		</div>
 	</details>

@@ -262,6 +262,40 @@ Package-specific detail lives next to the code — goo internals in
   doesn't drag copies of neighbour boxes along; goo is open-ended (never settles) and
   coupled, so it always rebuilds.
 
+- **Explicit freeze/unfreeze; a group that resizes itself.** Auto-settle is a
+  *derived* freeze (`CAEngine.settled`); apps can also hold a group deliberately via
+  `CAEngine.freeze()` / `unfreeze()` / `frozen` (runtime `bio.freeze / unfreeze /
+  frozen`). `frozen = manualHold || settled`, and the runtime's rigid-translate path
+  now keys off `frozen` (not `settled`), so a **partly-grown** group can be frozen
+  and still slide as one piece. A *manual* freeze additionally makes the runtime
+  **defer** a rebuild: a detected size change (or divergent move) while frozen is
+  recorded on the group and applied on `unfreeze()`/`reset()`, instead of rebuilding
+  every frame — so an animated accordion can be held through its transition and
+  re-grown once. `unfreeze()` with nothing deferred resumes (`wake()`); with a
+  deferred change, or after a rigid translate (whose baked obstacles are now stale),
+  it rebuilds. `reset()` / `wake()` / any rebuild clears the hold.
+- **A group can change its own size (FAQ/accordion).** The rect diff already rebuilds
+  — never translates — a group whose *own* target changed size, since a height change
+  moves the perimeter relative to the grid's cells. So a card whose nested `<details>`
+  expand re-rasterizes and re-grows on each open (its re-seed counter ticks) while
+  neighbours below merely translate. `pages/index.astro` shows both, plus a
+  **condition-based redraw**: `data-bio-regrow-on` (`open`/`close`) +
+  `data-bio-regrow-group` + an optional `data-bio-regrow-gate` checkbox id make
+  `demo.ts` rebuild a group when a `<details>` toggles — used so the "grow spikes"
+  toggle re-fits when the group-relative-reflow panel *closes* instead of sliding its
+  frozen spikes over the group above. The demo panel's `freeze (hold shape)` checkbox
+  drives `bio.freeze`/`unfreeze` on every group.
+- **The canvas is document-sized and re-fitted on every rebuild.** An engine's canvas
+  spans the whole document (`max(innerHeight, documentElement.scrollHeight)`), so growth
+  stays attached to targets on scroll. It used to be sized only at construction / window
+  resize, which clipped a target that a content reflow had pushed below the old extent: the
+  group translated while settled (canvas CSS-translated, fine), but the moment anything
+  rebuilt it (`setMode` → `refreshActivity` → `reset()`, a param reset, `regrow-on-close`)
+  the grid no longer covered the button and only the top half grew. `fitCanvas()` (split out
+  of `resize()`) is now called at the top of every `reset()`, so the grid is re-fitted before
+  rasterizing; the translate path is unchanged (no reset, no re-fit). Each group has its own
+  canvas, so one group's re-fit never disturbs another.
+
 ## Conventions
 - No comments unless asked; match existing file style; one material per page.
 - Verify edits: `npm run build`; run the dev server if available.

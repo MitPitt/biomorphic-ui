@@ -157,6 +157,41 @@ export function startDemo(): void {
 		});
 	});
 
+	// freeze: hold every group's current field (no advance, no rebuild). Unfreezing
+	// resumes in place, or rebuilds a group that was rigidly translated while frozen
+	// so it re-adjusts to the layout.
+	const freezeEl = document.getElementById("freeze") as HTMLInputElement | null;
+	freezeEl?.addEventListener("change", () => {
+		const on = freezeEl.checked;
+		each((e) => {
+			if (!e) return;
+			if (on) e.freeze();
+			else e.unfreeze();
+		});
+	});
+
+	// condition-based redraw: `<details>` (or any element firing `toggle`) with
+	// data-bio-regrow-on can force a group to rebuild when it opens/closes, so a
+	// group that moved while another panel was open re-grows against the new layout
+	// instead of keeping a stale rigid shape. Optional gate = a checkbox id.
+	document
+		.querySelectorAll<HTMLElement>("[data-bio-regrow-on]")
+		.forEach((node) => {
+			const when = node.dataset.bioRegrowOn ?? "close";
+			const group = node.dataset.bioRegrowGroup || undefined;
+			const gate = node.dataset.bioRegrowGate;
+			node.addEventListener("toggle", () => {
+				const open = (node as HTMLDetailsElement).open;
+				if (when === "open" && !open) return;
+				if (when === "close" && open) return;
+				if (gate) {
+					const c = document.getElementById(gate) as HTMLInputElement | null;
+					if (c && !c.checked) return;
+				}
+				bio.reset(group);
+			});
+		});
+
 	speedEl.addEventListener("input", () => {
 		const v = parseInt(speedEl.value, 10);
 		each((e) => {

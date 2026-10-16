@@ -82,6 +82,21 @@ export interface Bio {
 	reset(group?: string): void;
 	/** Wake a settled group so it relaxes again. */
 	wake(group?: string): void;
+	/**
+	 * Hold a group's current field without advancing, and *defer* any rebuild of it:
+	 * a resize or divergent move while frozen is applied on `unfreeze()`/`reset()`,
+	 * so an animated reflow can be held and then re-grown once. A pure move still
+	 * slides the frozen shape rigidly.
+	 */
+	freeze(group?: string): void;
+	/**
+	 * Release a manual freeze. If the group had been rigidly translated while frozen
+	 * its field is stale, so it rebuilds (re-rasterizes and re-grows); otherwise it
+	 * just resumes. The per-group "unfreeze so it can re-adjust" switch.
+	 */
+	unfreeze(group?: string): void;
+	/** True while a group is manually frozen or has settled. */
+	frozen(group?: string): boolean;
 	/** Re-fit a group's grid to the canvas. */
 	resize(group?: string): void;
 	/** Register every element matching the selector under `root`. */
@@ -99,6 +114,8 @@ interface GroupState {
 	targets: Map<HTMLElement, ActivityMode>;
 	/** Last-seen document rect per target, for translation-aware reflow detection. */
 	rects: Map<HTMLElement, Rect>;
+	/** True when a change arrived while manually frozen and its rebuild was deferred. */
+	dirty: boolean;
 	ro: ResizeObserver | null;
 	pending: number;
 }
@@ -191,13 +208,20 @@ export function createBio(opts: CreateBioOptions): Bio {
 		for (const el of g.targets.keys()) g.rects.set(el, rectOf(el));
 	};
 
+	/** Rebuild a group from the current layout and clear any deferred-rebuild flag. */
+	const rebuild = (g: GroupState): void => {
+		g.dirty = false;
+		g.engine.reset();
+		refreshRects(g);
+	};
+
 	type RectsMove = { kind: 'none' } | { kind: 'translate'; dx: number; dy: number } | { kind: 'rebuild' };
 
 	/**
 	 * Compare current target rects against the last-seen ones and classify the
 	 * change. A *uniform pure translation* (every target keeps its size and moves by
-	 * the same delta) can move a settled group as one rigid piece; anything else
-	 * needs a rebuild. Always updates the stored rects.
+	 * the same delta) can move a frozen (settled or manually frozen) group as one
+	 * rigid piece; anything else needs a rebuild. Always updates the stored rects.
 	 */
 	const classify = (g: GroupState): RectsMove => {
 		let dx: number | null = null;
@@ -228,14 +252,20 @@ export function createBio(opts: CreateBioOptions): Bio {
 			g.pending = 0;
 			const m = classify(g);
 			if (m.kind === 'none') return;
-			// a settled field is self-contained: move it as one piece rather than
-			// re-growing. Otherwise (resized, members diverged, or still growing) rebuild.
-			if (m.kind === 'translate' && g.engine.settled) {
+			// a frozen field (manually frozen or settled) is self-contained: move it as
+			// one piece rather than re-growing.
+			if (m.kind === 'translate' && g.engine.frozen) {
 				g.engine.translateBy(m.dx, m.dy);
 				return;
 			}
-			g.engine.reset();
-			refreshRects(g);
+			// a *manually* frozen group is held through any other change (a resize, or a
+			// divergent move): record that a rebuild is due and defer it to
+			// unfreeze()/reset(), so an animated reflow doesn't thrash the field.
+			if (g.engine.manualFrozen) {
+				g.dirty = true;
+				return;
+			}
+			rebuild(g);
 		});
 	};
 
@@ -254,6 +284,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 			canvas,
 			targets: new Map(),
 			rects: new Map(),
+			dirty: false,
 			ro: null,
 			pending: 0,
 			engine: undefined as unknown as CAEngine,
@@ -309,8 +340,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 		g.targets.set(el, mode);
 		owner.set(el, groupId);
 		g.ro?.observe(el);
-		g.engine.reset();
-		refreshRects(g);
+		rebuild(g);
 		if (!primaryId) primaryId = groupId;
 	};
 
@@ -321,8 +351,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 		g.rects.delete(el);
 		owner.delete(el);
 		g.ro?.unobserve(el);
-		g.engine.reset();
-		refreshRects(g);
+		rebuild(g);
 	};
 
 	const setMode = (el: HTMLElement, mode: ActivityMode): void => {
@@ -331,6 +360,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 		g.targets.set(el, mode);
 		el.dataset.bioMode = mode;
 		g.engine.refreshActivity();
+		g.dirty = false;
 		refreshRects(g);
 	};
 
@@ -365,6 +395,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 		if (group) {
 			const g = groups.get(group);
 			if (g) {
+				g.dirty = false;
 				g.engine.setMaterial(registry[id]);
 				refreshRects(g);
 			}
@@ -378,6 +409,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 			return;
 		}
 		for (const g of groups.values()) {
+			g.dirty = false;
 			g.engine.setMaterial(registry[id]);
 			refreshRects(g);
 		}
@@ -397,12 +429,11 @@ export function createBio(opts: CreateBioOptions): Bio {
 		// registering happens one element at a time, so earlier groups missed the
 		// later ones as obstacles; a single pass now makes the neighbourhood symmetric.
 		for (const g of groups.values()) {
-			g.engine.reset();
-			refreshRects(g);
+			rebuild(g);
 		}
 	};
 
-	const onWindowResize = (): void => forEachGroup(undefined, (g) => g.engine.resize());
+	const onWindowResize = (): void => forEachGroup(undefined, (g) => { g.dirty = false; g.engine.resize(); });
 	// a document reflow (content above moves) may not resize any target individually;
 	// the documentElement observer catches it, then the rect diff decides which groups
 	// are actually affected.
@@ -423,12 +454,20 @@ export function createBio(opts: CreateBioOptions): Bio {
 		unregister,
 		setMode,
 		setMaterial,
-		reset: (group) => forEachGroup(group, (g) => {
-			g.engine.reset();
+		reset: (group) => forEachGroup(group, (g) => rebuild(g)),
+		wake: (group) => forEachGroup(group, (g) => g.engine.wake()),
+		freeze: (group) => forEachGroup(group, (g) => g.engine.freeze()),
+		unfreeze: (group) => forEachGroup(group, (g) => {
+			// a deferred rebuild wins: re-rasterize against the new layout instead of
+			// resuming a field whose substrate is stale
+			if (g.dirty) { g.dirty = false; g.engine.reset(); } else g.engine.unfreeze();
 			refreshRects(g);
 		}),
-		wake: (group) => forEachGroup(group, (g) => g.engine.wake()),
-		resize: (group) => forEachGroup(group, (g) => g.engine.resize()),
+		frozen: (group) => {
+			const id = group ?? primaryId;
+			return id ? !!groups.get(id)?.engine.frozen : false;
+		},
+		resize: (group) => forEachGroup(group, (g) => { g.dirty = false; g.engine.resize(); }),
 		scan,
 		destroy: () => {
 			if (typeof window !== 'undefined') window.removeEventListener('resize', onWindowResize);

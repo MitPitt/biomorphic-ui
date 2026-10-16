@@ -72,6 +72,13 @@ export class CAEngine {
 	seedChance = 0.5;
 	cellSize = 4;
 	playing = true;
+	/**
+	 * Manual freeze (see `freeze()`): holds the current field without advancing,
+	 * independent of auto-settle. A manually held field also moves rigidly on reflow
+	 * instead of re-growing, and the runtime *defers* any rebuild of it, so this is
+	 * the per-group "stop here / treat as final" switch an app can flip.
+	 */
+	private hold = false;
 	subSelector = '.sub';
 	/** Elements rasterized on reset (with activity mode); swappable by the runtime. */
 	targets: () => TargetSpec[];
@@ -162,7 +169,14 @@ export class CAEngine {
 		this.reset();
 	}
 
-	resize(): void {
+	/**
+	 * Size the canvas to the whole document and (re)create the state grid when its
+	 * dimensions changed. Returns true if the grid was rebuilt. Called by every
+	 * `reset()`, so a reflow that grew the document (an opened panel pushing a target
+	 * down) re-fits the grid before rasterizing — otherwise a target below the old
+	 * canvas extent would be clipped. The canvas is only re-fitted, not re-seeded.
+	 */
+	private fitCanvas(): boolean {
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 		// cover the whole document so growth stays attached to elements on scroll
 		const cssW = document.documentElement.clientWidth || window.innerWidth;
@@ -182,16 +196,25 @@ export class CAEngine {
 		const cell = Math.max(this.cellSize, minCell);
 		const w = Math.max(8, Math.round(this.canvas.width / cell));
 		const h = Math.max(8, Math.round(this.canvas.height / cell));
+		const changed = !this.texA || w !== this.w || h !== this.h;
 		this.w = w;
 		this.h = h;
 		this.cellCss = this.canvas.width / w / dpr;
-		// the resolve target holds a signed coverage field; it must interpolate
-		this.resolveFilter = this.gl.LINEAR;
-		this.createTargets();
+		if (changed) {
+			// the resolve target holds a signed coverage field; it must interpolate
+			this.resolveFilter = this.gl.LINEAR;
+			this.createTargets();
+		}
+		return changed;
+	}
+
+	resize(): void {
+		this.fitCanvas();
 		this.reset();
 	}
 
 	stepOnce(): void {
+		if (this.hold) return;
 		if (this.live) {
 			if (this.liveSettled) return;
 			const patch = this.live.tick();
@@ -208,6 +231,7 @@ export class CAEngine {
 
 	/** Wake a settled sim so it re-relaxes (called when a param changes). */
 	wake(): void {
+		this.hold = false;
 		this.frame = 0;
 		this.liveIdle = 0;
 		this.liveSettled = false;
@@ -223,6 +247,7 @@ export class CAEngine {
 
 	/** Run the sim to its settled state in one go (bounded by `settleAt`/idle). */
 	settleNow(): void {
+		if (this.hold) return;
 		if (this.live) {
 			// only a finite live sim has a settled state; open-ended goo has none
 			if (!this.liveFinite || this.liveSettled) return;
@@ -253,10 +278,53 @@ export class CAEngine {
 	}
 
 	/**
+	 * True while this group is held still — either manually (`freeze()`) or because
+	 * it has reached its settled state. A frozen field is self-contained, so it moves
+	 * rigidly on reflow instead of re-growing; `freeze()` therefore also opts a
+	 * partly-grown group into the runtime's translate-don't-rebuild path.
+	 */
+	get frozen(): boolean {
+		return this.hold || this.settled;
+	}
+
+	/**
+	 * True only for an explicit `freeze()` (not for a merely settled sim). The
+	 * runtime uses this to *defer* a rebuild — holding the field through a resize or
+	 * a divergent move until `unfreeze()`/`reset()`, so an animated reflow doesn't
+	 * rebuild every frame.
+	 */
+	get manualFrozen(): boolean {
+		return this.hold;
+	}
+
+	/**
+	 * Hold the current field: stop advancing without rebuilding or re-seeding, so a
+	 * shape can be frozen mid-growth or after settling and held indefinitely. Unlike
+	 * pausing, this is per-group and marks the field as final for reflow purposes (the
+	 * runtime translates a merely-moved field and defers rebuilding a resized one).
+	 */
+	freeze(): void {
+		this.hold = true;
+	}
+
+	/**
+	 * Release a manual freeze and resume. If the group had been rigidly translated
+	 * while frozen, its field's obstacles are stale, so rebuild instead of resuming
+	 * (re-rasterize against the new layout, then re-grow); otherwise re-arm a settled
+	 * sim in place so it can relax again. This is the "unfreeze for a moment so it can
+	 * adjust" switch for apps.
+	 */
+	unfreeze(): void {
+		this.hold = false;
+		if (this.tx !== 0 || this.ty !== 0) { this.reset(); return; }
+		this.wake();
+	}
+
+	/**
 	 * Move this group's *finished* output as a whole by (dx, dy) CSS px, without
 	 * re-simulating: the canvas holding the field is translated, so a settled shape
 	 * separates from its neighbours like a jigsaw piece. Cleared by `reset()`/
-	 * `resize()`. Only meaningful while `settled` (a moving group that is still
+	 * `resize()`. Only meaningful while `frozen` (a moving group that is still
 	 * growing, or a live group, is rebuilt instead — see the runtime).
 	 */
 	translateBy(dx: number, dy: number): void {
@@ -324,6 +392,9 @@ export class CAEngine {
 	 * rebuild the seed (field sims must, since their tissue is coupled).
 	 */
 	refreshActivity(): void {
+		// if the document reflowed, the grid must be re-fitted before masks mean
+		// anything; an in-place swap can't re-scale the state, so rebuild instead.
+		if (this.fitCanvas()) { this.reset(); return; }
 		const { substrate, active } = this.rasterizeMasks();
 		// a live backend that can update its masks in place keeps the sim running for
 		// any mode change (goo: SDF + emitters recomputed, fluid untouched)
@@ -336,10 +407,12 @@ export class CAEngine {
 
 	reset(): void {
 		const gl = this.gl;
-		const { w, h } = this;
 		this.clearTransform();       // a rebuild re-rasterizes at true coordinates
+		this.fitCanvas();            // re-fit the grid if the document grew/shrank
+		const { w, h } = this;
 		this.frame = 0;              // restart any frame-driven growth animation
 		this.clock = 0;
+		this.hold = false;   // a rebuild is a fresh, growing field
 		this.liveIdle = 0;
 		this.liveSettled = false;
 		this.liveFinite = !!this.material.live?.finite;
@@ -444,7 +517,7 @@ export class CAEngine {
 	private loop = (): void => {
 		this.raf = requestAnimationFrame(this.loop);
 		if (this.live) {
-			if (this.playing && !this.liveSettled) {
+			if (this.playing && !this.hold && !this.liveSettled) {
 				let any = false;
 				for (let i = 0; i < this.speed; i++) {
 					const patch = this.live.tick();
@@ -456,7 +529,7 @@ export class CAEngine {
 				if (any) this.liveIdle = 0;
 				else if (this.liveFinite && ++this.liveIdle >= 3) this.liveSettled = true;
 			}
-		} else if (this.playing) {
+		} else if (this.playing && !this.hold) {
 			// stop stepping once the field has settled (settleAt); wake() restarts it
 			for (let i = 0; i < this.speed && this.frame < this.settleAt; i++) this.step();
 		}

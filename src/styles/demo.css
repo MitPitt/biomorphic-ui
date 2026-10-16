@@ -116,6 +116,36 @@ h1 {
 	width: 150px;
 	height: 140px;
 }
+/* self-resizing group: nested <details> grow the card height, so the group's own
+   rect changes and the runtime re-rasterizes + re-grows it (see demo.ts counters) */
+.faq {
+	margin-top: 40px;
+}
+.faq details {
+	margin-top: 12px;
+	border-top: 1px solid var(--line);
+	padding-top: 8px;
+}
+.faq summary {
+	cursor: pointer;
+	list-style: none;
+	color: var(--dim);
+	font-size: 12px;
+	letter-spacing: 0.06em;
+}
+.faq summary::-webkit-details-marker {
+	display: none;
+}
+.faq summary::before {
+	content: "▸ ";
+	color: #5a6068;
+}
+.faq details[open] > summary::before {
+	content: "▾ ";
+}
+.faq details p {
+	margin: 8px 0 0;
+}
 /* cross-page nav */
 .pages {
 	display: flex;
