@@ -15,6 +15,7 @@ export { checkUniforms, declaredUniforms, wrapFragment } from './glsl';
 export { T, DIRS, headingFromVector } from './types';
 export type {
 	ActivityMode,
+	FieldData,
 	LiveHandle,
 	LivePatch,
 	Material,
@@ -24,4 +25,5 @@ export type {
 	ParamSection,
 	SeedCtx,
 	TargetSpec,
+	UpsampleMode,
 } from './types';

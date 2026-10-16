@@ -291,6 +291,16 @@ h1 {
 .check input {
 	accent-color: #6fbf4a;
 }
+.check select {
+	font: inherit;
+	font-size: 11px;
+	color: var(--ink);
+	background: #14161a;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 2px 4px;
+	max-width: 138px;
+}
 #panel details {
 	margin: 0 0 6px;
 	border-top: 1px solid var(--line);

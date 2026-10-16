@@ -1,5 +1,5 @@
 import { createBio } from "@biomorphic/ca-core";
-import type { ActivityMode, ParamDef } from "@biomorphic/ca-core";
+import type { ActivityMode, ParamDef, UpsampleMode } from "@biomorphic/ca-core";
 import { materials } from "../materials";
 
 /**
@@ -33,8 +33,10 @@ export function startDemo(): void {
 	const resetBtn = el<HTMLButtonElement>("reset");
 	const speedEl = el<HTMLInputElement>("speed");
 	const cellEl = el<HTMLInputElement>("cell");
+	const budgetEl = el<HTMLInputElement>("cellbudget");
 	const speedV = el("speed-v");
 	const cellV = el("cell-v");
+	const budgetV = el("budget-v");
 	const paramsHost = el("params");
 
 	const each = (fn: (e: ReturnType<typeof bio.engine>) => void) => {
@@ -122,10 +124,23 @@ export function startDemo(): void {
 	const sliderFromCell = (c: number) =>
 		(1000 * Math.log(c / CELL_MIN)) / Math.log(CELL_MAX / CELL_MIN);
 
+	// cell budget: the per-group grid cap (masters reset/seed/field/sim cost at a fine
+	// cell size). Log-scaled so the low, laggy end gets most of the slider.
+	const BUDGET_MIN = 250_000;
+	const BUDGET_MAX = 8_000_000;
+	const budgetFromSlider = (v: number) =>
+		BUDGET_MIN * Math.pow(BUDGET_MAX / BUDGET_MIN, v / 1000);
+	const sliderFromBudget = (b: number) =>
+		(1000 * Math.log(b / BUDGET_MIN)) / Math.log(BUDGET_MAX / BUDGET_MIN);
+	const fmtBudget = (b: number) =>
+		b >= 1_000_000 ? (b / 1_000_000).toFixed(2) + "M" : Math.round(b / 1000) + "k";
+
 	speedEl.value = String(engine.speed);
 	speedV.textContent = String(engine.speed);
 	cellEl.value = String(Math.round(sliderFromCell(engine.cellSize)));
 	cellV.textContent = engine.cellSize.toFixed(2);
+	budgetEl.value = String(Math.round(sliderFromBudget(engine.maxCells)));
+	budgetV.textContent = fmtBudget(engine.maxCells);
 	buildParams();
 
 	playBtn.addEventListener("click", () => {
@@ -209,6 +224,26 @@ export function startDemo(): void {
 		});
 		cellV.textContent = c.toFixed(2);
 		bio.resize();
+	});
+	budgetEl.addEventListener("input", () => {
+		budgetV.textContent = fmtBudget(budgetFromSlider(parseFloat(budgetEl.value)));
+	});
+	budgetEl.addEventListener("change", () => {
+		const b = Math.round(budgetFromSlider(parseFloat(budgetEl.value)));
+		each((e) => {
+			if (e) e.maxCells = b;
+		});
+		budgetV.textContent = fmtBudget(b);
+		bio.resize();
+	});
+
+	// upsample: how the resolve texture is reconstructed to the canvas (look-only)
+	const upsampleEl = document.getElementById("upsample") as HTMLSelectElement | null;
+	upsampleEl?.addEventListener("change", () => {
+		const mode = upsampleEl.value as UpsampleMode;
+		each((e) => {
+			if (e) e.setUpsample(mode);
+		});
 	});
 
 	// mode toggle: cycles the states declared by the page (2 for flora/tree,

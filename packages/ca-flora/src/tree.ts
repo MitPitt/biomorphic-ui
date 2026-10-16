@@ -276,8 +276,8 @@ function makeSpikeSolver(
 				const j = yy * w + xx;
 				if (substrate[j] || done[j] || dist[j] > band) continue;
 				// cost is evaluated at the receiving cell j (its normal and jitter)
-				let nx = norm[j * 4];
-				let ny = norm[j * 4 + 1];
+				let nx = norm[j * 2];
+				let ny = norm[j * 2 + 1];
 				const na = (hash21(xx, yy) - 0.5) * wander + drift * (vnoise(xx, yy) - 0.5) * 2;
 				const ca = Math.cos(na);
 				const sa = Math.sin(na);

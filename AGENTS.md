@@ -295,6 +295,38 @@ Package-specific detail lives next to the code — goo internals in
   of `resize()`) is now called at the top of every `reset()`, so the grid is re-fitted before
   rasterizing; the translate path is unchanged (no reset, no re-fit). Each group has its own
   canvas, so one group's re-fit never disturbs another.
+- **Reset is the cost centre; the master lever is the cell budget.** Every `reset()`
+  rasterizes the substrate, builds the seed + normal field and uploads textures — all
+  O(grid cells) — and each group's grid spans the whole document, so a tiny `cellSize`
+  (which hits the grid cap) is expensive *per group*. The dominant cost at a fine grid was
+  the **normal field** (`chamfer` + two full-res `boxBlur`s ≈ 290 ms/group at 4M cells),
+  so two structural fixes now apply: (1) `reset()` **caches** the field — it depends only on
+  the rasterized substrate + field params, and `rasterizeMasks` returns a `key` over exactly
+  those inputs (box rects, substrate membership, shape spec, grid, params), so a plain reset
+  or an active↔wall toggle *reuses the field texture* with no CPU build or upload; (2)
+  `Material.field` may return `{data,w,h}` and spikes builds the normal field at a capped
+  resolution (~400k cells) that the engine upsamples with `LINEAR` (`u_field` is sampled
+  via `texture(u_field, (P+0.5)/textureSize(u_state))`, not `texelFetch`), which took the
+  build from ~290 ms to ~18 ms. Other cheap wins: only `texA` is uploaded (a shader step
+  fully writes `texB` before its first read, and the live seam only uses `texA`); `u_field`
+  is a tightly packed 2-channel `RG32F` (was RGBA32F); `boxBlur` uses precomputed clamp
+  index tables instead of per-element `Math.min/max`; `seedEdges` *dilates the source cells*
+  instead of testing every free cell × 8 (O(sources), order-preserving so seeds are
+  unchanged); and `refreshActivity` resets a shader sim rather than building masks twice.
+  The real bound is `cellBudget` (`createBio`) / `maxCells` (`CAEngine`) — the cap on each
+  group's grid (default 4M cells; was 8M). Memory, seed/field CPU, upload and per-step sim
+  cost all scale with it (8M cells = 128MB RGBA32F per state texture, ×2 for ping-pong,
+  *per group*). Instant mode runs the whole `settleAt`-step sim in one shot, so its latency
+  scales the same way — lower the budget, not the settle bound.
+- **Aliasing vs `boxBlur`; upsample filter.** `boxBlur` smooths the *growth-direction*
+  field (it shapes spikes), not the rendered edge. The rendered edge quality is the blit's
+  reconstruction of the resolve texture, so `CAEngine.setUpsample(mode)` picks it (a
+  look-only toggle, also honoured on the next `createTargets`): `linear` (default; hardware
+  `LINEAR` interpolates the signed coverage → smooth silhouette), `nearest` (grid pixels),
+  and `cubic` (Catmull-Rom, 4 taps/axis) / `lanczos` (Lanczos-3, 6 taps/axis), which the
+  blit shader gathers manually via `texelFetch` (WebGL hardware filtering only offers
+  NEAREST/LINEAR) `BLIT_FS` in `glsl.ts`. The demo panel exposes `cell budget` (`maxCells`,
+  live via `bio.resize()`), `cell size` and the `upsample` dropdown.
 
 ## Conventions
 - No comments unless asked; match existing file style; one material per page.

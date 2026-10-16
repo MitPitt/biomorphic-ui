@@ -57,6 +57,12 @@ export interface CreateBioOptions {
 	 * is unaffected. 0 = collide at the boundary.
 	 */
 	neighborAura?: number;
+	/**
+	 * Upper bound on each group's grid cells (default 4M). Small `cellSize` settings
+	 * would otherwise allocate a huge per-group grid; this caps it and raises the
+	 * effective minimum cell. Lower it to trade sim detail for speed/memory.
+	 */
+	cellBudget?: number;
 }
 
 export interface RegisterOptions {
@@ -309,6 +315,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 			occupancy: collideNeighbors ? occupancy : undefined,
 			token: collideNeighbors ? tokenFor(id) : 0,
 			neighborAura: collideNeighbors ? (opts.neighborAura ?? 0) : 0,
+			maxCells: opts.cellBudget,
 			rand: mulberry32((baseSeed ^ hashStr(id)) >>> 0),
 		});
 		if (opts.params) Object.assign(state.engine.params, opts.params);

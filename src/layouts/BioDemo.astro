@@ -82,9 +82,27 @@ const {
 				<span>freeze (hold shape)</span>
 				<input id="freeze" type="checkbox" />
 			</label>
+			<label class="check">
+				<span>upsample</span>
+				<select id="upsample">
+					<option value="linear">linear (smooth)</option>
+					<option value="nearest">nearest (crisp)</option>
+					<option value="cubic">bicubic (catmull-rom)</option>
+					<option value="lanczos">lanczos-3</option>
+				</select>
+			</label>
 			<label class="ctrl global"
 				><span>cell size (all rules) <b id="cell-v"></b></span><input
 					id="cell"
+					type="range"
+					min="0"
+					max="1000"
+					step="1"
+				/></label
+			>
+			<label class="ctrl global"
+				><span>cell budget <b id="budget-v"></b></span><input
+					id="cellbudget"
 					type="range"
 					min="0"
 					max="1000"

@@ -43,7 +43,7 @@ void main() {
 	vec4 self = fetchAt(u_state, P);
 	if (int(self.r + 0.5) == 1) { outColor = self; return; }   // substrate is frozen
 
-	vec2 nrm = texelFetch(u_field, P, 0).rg;
+	vec2 nrm = texture(u_field, (vec2(P) + 0.5) / vec2(textureSize(u_state, 0))).rg;
 	if (dot(nrm, nrm) < 0.25) { outColor = self; return; }
 	nrm = normalize(nrm);
 	float a = (hash21(vec2(P)) - 0.5) * u_wander;
@@ -218,33 +218,48 @@ function pickSpaced(
 	return chosen;
 }
 
+/** Scratch for the seed scan, reused across resets (sized to the grid). */
+let seenScratch = new Uint8Array(0);
+
 /** Seed free cells touching an ACTIVE substrate cell, spaced, each with a random budget. */
 function seedEdges(ctx: SeedCtx, budget: (rand: () => number) => number): Float32Array {
 	const { w, h, substrate, seedChance, rand, params } = ctx;
 	const active = ctx.active ?? substrate;
 	const out = new Float32Array(w * h * 4);
 	const spacing = Math.max(1, params.spacing ?? 4);
+	// One pass sets the frozen-substrate flag, the empty sentinel, and collects the
+	// source cells. Then we *dilate the sources* (mark their free neighbours) instead
+	// of scanning every free cell against its 8 neighbours: O(sources) not O(cells).
+	const sources: number[] = [];
 	for (let i = 0; i < w * h; i++) {
-		if (substrate[i]) out[i * 4] = T.SUBSTRATE;
-		else out[i * 4 + 1] = -1e9;
+		if (substrate[i]) {
+			out[i * 4] = T.SUBSTRATE;
+			if (active[i]) sources.push(i);
+		} else {
+			out[i * 4 + 1] = -1e9;
+		}
 	}
+	if (seenScratch.length < w * h) seenScratch = new Uint8Array(w * h);
+	const seen = seenScratch;
+	seen.fill(0, 0, w * h);
+	for (const i of sources) {
+		const gx = i % w;
+		const gy = (i / w) | 0;
+		for (const [dx, dy] of DIRS) {
+			const nx = gx + dx;
+			const ny = gy + dy;
+			if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+			const j = ny * w + nx;
+			if (!substrate[j]) seen[j] = 1;   // a free cell on an active rim
+		}
+	}
+	// collect in scan order so the greedy spacing picks reproducibly the same seeds
+	// as the old all-cells scan
 	const cands: Array<{ x: number; y: number }> = [];
 	for (let gy = 0; gy < h; gy++) {
 		for (let gx = 0; gx < w; gx++) {
 			const i = gy * w + gx;
-			if (substrate[i]) continue;
-			let touches = false;
-			for (const [dx, dy] of DIRS) {
-				const nx = gx + dx;
-				const ny = gy + dy;
-				if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-				const j = ny * w + nx;
-				if (active[j] && substrate[j]) {   // a source WITH a shape (both-mode)
-					touches = true;
-					break;
-				}
-			}
-			if (touches) cands.push({ x: gx, y: gy });
+			if (seen[i]) cands.push({ x: gx, y: gy });
 		}
 	}
 	for (const c of pickSpaced(cands, spacing, seedChance, rand)) {
@@ -272,11 +287,35 @@ export const spikes: Material = {
 	// the front propagates within that budget, so 3*height ticks is a safe upper
 	// bound on settling. After that the engine stops stepping until a param wakes it.
 	settle: (p) => Math.ceil(3 * (p.height ?? 26)) + 48,
-	field: (ctx) =>
-		normalField(
-			ctx,
-			Math.min(32, Math.max(2, Math.round((ctx.params.height ?? 26) / Math.max(1, ctx.params.sharpness ?? 4)))),
-		),
+	field: (ctx) => {
+		const height = ctx.params.height ?? 26;
+		const sharpness = Math.max(1, ctx.params.sharpness ?? 4);
+		const radius = Math.min(32, Math.max(2, Math.round(height / sharpness)));
+		// The normal field is a smooth direction field: build it at a capped
+		// resolution and let the engine upsample it (LINEAR), so a fine state grid
+		// doesn't pay full-resolution chamfer + blur cost. Obstacles are still
+		// enforced at full res in the state, so a missed thin wall in the field
+		// cannot let growth through.
+		const MAX_FIELD_CELLS = 400_000;
+		const scale = Math.max(1, Math.round(Math.sqrt((ctx.w * ctx.h) / MAX_FIELD_CELLS)));
+		if (scale <= 1) return normalField(ctx, radius);
+		const fw = Math.max(1, Math.ceil(ctx.w / scale));
+		const fh = Math.max(1, Math.ceil(ctx.h / scale));
+		const sub = new Uint8Array(fw * fh);
+		const half = scale >> 1;
+		for (let y = 0; y < fh; y++) {
+			const sy = Math.min(ctx.h - 1, y * scale + half);
+			for (let x = 0; x < fw; x++) {
+				const sx = Math.min(ctx.w - 1, x * scale + half);
+				sub[y * fw + x] = ctx.substrate[sy * ctx.w + sx];
+			}
+		}
+		const data = normalField(
+			{ ...ctx, w: fw, h: fh, substrate: sub, active: sub },
+			Math.max(1, Math.round(radius / scale)),
+		);
+		return { data, w: fw, h: fh };
+	},
 	params: [
 		{ key: 'height', label: 'spike height', min: 4, max: 1000, step: 2, value: 26, reset: true },
 		{ key: 'sharpness', label: 'sharpness (thinner)', min: 2, max: 16, step: 1, value: 4 },

@@ -1,6 +1,9 @@
 import { BLIT_FS, BUILTIN_UNIFORMS, declaredUniforms, VERT } from './glsl';
 import { applyShapeCss, insideShape, shapeSpecOf } from './shapes';
-import type { ActivityMode, LiveHandle, LivePatch, Material, Occupancy, SeedCtx, TargetSpec } from './types';
+import type { ActivityMode, FieldData, LiveHandle, LivePatch, Material, Occupancy, SeedCtx, TargetSpec, UpsampleMode } from './types';
+
+/** `UpsampleMode` -> the blit shader's `u_filter` value. */
+const UPSAMPLE: Record<UpsampleMode, number> = { linear: 0, nearest: 1, cubic: 2, lanczos: 3 };
 
 type Params = Record<string, number>;
 
@@ -30,6 +33,14 @@ export interface EngineOptions {
 	occupancy?: Occupancy;
 	/** This group's token within `occupancy` (`0` = none). */
 	token?: number;
+	/**
+	 * Upper bound on the state grid's cells (default 4M). The canvas covers the whole
+	 * document, so a very small `cellSize` would otherwise allocate a huge grid; this
+	 * caps it (raising the effective minimum cell). Lower it to trade detail for
+	 * memory/CPU/GPU cost — every reset, seed, field, upload and sim step scales with
+	 * the cell count, so this is the master perf lever.
+	 */
+	maxCells?: number;
 	/** Deterministic RNG handed to seeding; defaults to Math.random. */
 	rand?: () => number;
 }
@@ -86,6 +97,8 @@ export class CAEngine {
 	obstacles: () => HTMLElement[];
 	/** Cross-group separation in CSS px, applied to foreign colliders only. */
 	neighborAura = 0;
+	/** Cap on grid cells (see `EngineOptions.maxCells`); raises the min cell size. */
+	maxCells = 4_000_000;
 	/** Shared live-tissue map (owned by the runtime), or undefined when standalone. */
 	occupancy?: Occupancy;
 	/** This group's token within `occupancy`. */
@@ -96,6 +109,8 @@ export class CAEngine {
 	private dpr = 1;
 	private cellCss = 4;
 	private resolveFilter = 0;
+	/** Blit shader's `u_filter`: 0 linear, 1 nearest, 2 cubic, 3 lanczos. */
+	private upsample = 0;
 
 	private w = 0;
 	private h = 0;
@@ -106,6 +121,8 @@ export class CAEngine {
 	private resTex!: WebGLTexture;
 	private resFbo!: WebGLFramebuffer;
 	private texField: WebGLTexture | null = null;
+	/** `rasterizeMasks().key` the current static field was built from (cache validity). */
+	private fieldKey = 0;
 	private simProg!: WebGLProgram;
 	private resProg!: WebGLProgram;
 	private blitProg!: WebGLProgram;
@@ -150,6 +167,7 @@ export class CAEngine {
 				})));
 		this.obstacles = opts.obstacles ?? (() => []);
 		this.neighborAura = opts.neighborAura ?? 0;
+		this.maxCells = opts.maxCells ?? this.maxCells;
 		this.occupancy = opts.occupancy;
 		this.token = opts.token ?? 0;
 		this.rand = opts.rand ?? Math.random;
@@ -164,6 +182,7 @@ export class CAEngine {
 		this.clearOccupancy();   // free old tissue before the material (and its flag) change
 		this.material = material;
 		this.params = paramsFrom(material);
+		this.fieldKey = 0;       // a different material's field must not be reused from cache
 		this.speed = material.speed ?? 3;
 		this.buildPrograms();
 		this.reset();
@@ -191,8 +210,7 @@ export class CAEngine {
 
 		// cellSize is in DEVICE pixels; allow true supersampling down to a cell budget.
 		const area = this.canvas.width * this.canvas.height;
-		const ABS_MAX = 8_000_000;
-		const minCell = Math.sqrt(area / ABS_MAX);
+		const minCell = Math.sqrt(area / Math.max(1, this.maxCells));
 		const cell = Math.max(this.cellSize, minCell);
 		const w = Math.max(8, Math.round(this.canvas.width / cell));
 		const h = Math.max(8, Math.round(this.canvas.height / cell));
@@ -201,11 +219,31 @@ export class CAEngine {
 		this.h = h;
 		this.cellCss = this.canvas.width / w / dpr;
 		if (changed) {
-			// the resolve target holds a signed coverage field; it must interpolate
-			this.resolveFilter = this.gl.LINEAR;
+			// the resolve target holds a signed coverage field; a hardware filter is
+			// only needed for linear/nearest (cubic/lanczos gather via texelFetch)
+			this.resolveFilter = this.upsample === 0 ? this.gl.LINEAR : this.gl.NEAREST;
 			this.createTargets();
 		}
 		return changed;
+	}
+
+	/**
+	 * How the resolve texture is upsampled to the canvas. `linear` (default)
+	 * interpolates the signed coverage for a smooth silhouette; `nearest` shows the
+	 * grid pixels; `cubic`/`lanczos` reconstruct with a sharper kernel in the blit
+	 * shader. Look-only — the sim state is untouched, so it re-renders in place.
+	 */
+	setUpsample(mode: UpsampleMode): void {
+		const n = UPSAMPLE[mode];
+		if (n === this.upsample) return;
+		this.upsample = n;
+		this.resolveFilter = n === 0 ? this.gl.LINEAR : this.gl.NEAREST;
+		const gl = this.gl;
+		if (this.resTex) {
+			gl.bindTexture(gl.TEXTURE_2D, this.resTex);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, this.resolveFilter);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, this.resolveFilter);
+		}
 	}
 
 	resize(): void {
@@ -340,8 +378,15 @@ export class CAEngine {
 		this.canvas.style.transform = "";
 	}
 
-	/** Rasterize the registered targets into substrate walls + the active subset. */
-	private rasterizeMasks(): { substrate: Uint8Array; active: Uint8Array; ownSubstrate: Uint8Array } {
+	/**
+	 * Rasterize the registered targets into substrate walls + the active subset, and
+	 * also return a `key` that identifies the *field inputs* — the rasterized box
+	 * rects, their substrate membership (active/wall both block; emitter does not),
+	 * the aura, the grid size and the params. `reset()` reuses the static field when
+	 * this key is unchanged, so a plain reset or an active↔wall toggle skips the
+	 * whole field build + upload (was the biggest per-reset cost).
+	 */
+	private rasterizeMasks(): { substrate: Uint8Array; active: Uint8Array; ownSubstrate: Uint8Array; key: number } {
 		const { w, h } = this;
 		const substrate = new Uint8Array(w * h);
 		const active = new Uint8Array(w * h);
@@ -349,6 +394,8 @@ export class CAEngine {
 		const cell = this.cellCss;
 		const scrX = window.scrollX;
 		const scrY = window.scrollY;
+		let key = 2166136261;
+		const mix = (v: number): void => { key ^= v | 0; key = Math.imul(key, 16777619); };
 		const paint = (el: HTMLElement, mode: ActivityMode, own: boolean): void => {
 			const spec = shapeSpecOf(el);
 			applyShapeCss(el, spec);
@@ -357,10 +404,16 @@ export class CAEngine {
 			const top = rr.top + scrY;
 			const right = rr.right + scrX;
 			const bottom = rr.bottom + scrY;
+			// field inputs: geometry + whether this box is substrate (emitter is not)
+			mix(left); mix(top); mix(right); mix(bottom);
+			mix(mode === 'emitter' ? 0 : 1); mix(own ? 1 : 0);
+			mix(spec.kind === 'rect' ? 0 : spec.kind === 'circle' ? 1 : spec.kind === 'polygon' ? 2 : 3);
+			mix(spec.sides ?? 6); mix(spec.points ?? 5);
 			const cx = (left + right) / 2;
 			const cy = (top + bottom) / 2;
 			// a foreign group's box is grown by the aura so we keep clear of it
 			const aura = own ? 0 : this.neighborAura;
+			mix(aura);
 			const rx = rr.width / 2 + aura;
 			const ry = rr.height / 2 + aura;
 			const x0 = Math.floor((left - aura) / cell);
@@ -383,7 +436,10 @@ export class CAEngine {
 		for (const { el, mode } of this.targets()) paint(el, mode, true);
 		// neighbours from other groups are obstacles only, never sources
 		for (const el of this.obstacles()) paint(el, 'wall', false);
-		return { substrate, active, ownSubstrate };
+		// grid + field params are part of the field's inputs
+		mix(w); mix(h); mix(Math.round(cell * 1000)); mix(this.neighborAura);
+		for (const p of this.material.params) mix(Math.round(this.params[p.key] * 1000));
+		return { substrate, active, ownSubstrate, key };
 	}
 
 	/**
@@ -392,17 +448,16 @@ export class CAEngine {
 	 * rebuild the seed (field sims must, since their tissue is coupled).
 	 */
 	refreshActivity(): void {
+		// no in-place swap (shader sims): a reset re-rasterizes anyway, so skip the
+		// extra mask build here.
+		if (!this.live?.setMasks) { this.reset(); return; }
 		// if the document reflowed, the grid must be re-fitted before masks mean
 		// anything; an in-place swap can't re-scale the state, so rebuild instead.
 		if (this.fitCanvas()) { this.reset(); return; }
 		const { substrate, active } = this.rasterizeMasks();
 		// a live backend that can update its masks in place keeps the sim running for
 		// any mode change (goo: SDF + emitters recomputed, fluid untouched)
-		if (this.live?.setMasks) {
-			this.live.setMasks(substrate, active);
-			return;
-		}
-		this.reset();
+		this.live.setMasks(substrate, active);
 	}
 
 	reset(): void {
@@ -436,7 +491,7 @@ export class CAEngine {
 		}
 		this.clearOccupancy();
 
-		const { substrate, active, ownSubstrate } = this.rasterizeMasks();
+		const { substrate, active, ownSubstrate, key } = this.rasterizeMasks();
 
 		const ctx = {
 			w,
@@ -460,13 +515,25 @@ export class CAEngine {
 				})()
 			: (this.live = null, this.material.seed!(ctx));
 
-		for (const tex of [this.texA, this.texB]) {
-			gl.bindTexture(gl.TEXTURE_2D, tex);
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data);
-		}
+		// Upload the initial state to texA only. The first shader step fully writes
+		// texB before it is ever read, and the live seam only ever uses texA, so the
+		// second full-texture upload is pure waste (it dominated reset for big grids).
+		gl.bindTexture(gl.TEXTURE_2D, this.texA);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data);
 
-		const field = this.material.field?.(ctx);
-		this.uploadField(field ?? null);
+		// Static field (spikes' normal field). It depends only on the rasterized
+		// substrate + params, so reuse the existing texture when `key` is unchanged —
+		// a plain reset or an active↔wall toggle then skips the field build AND its
+		// upload (the single biggest reset cost at a fine grid).
+		if (this.material.field) {
+			if (!(this.texField && key === this.fieldKey)) {
+				this.uploadField(this.material.field(ctx));
+				this.fieldKey = key;
+			}
+		} else {
+			this.uploadField(null);
+			this.fieldKey = 0;
+		}
 
 		if (this.instant) this.settleNow();
 	}
@@ -477,27 +544,33 @@ export class CAEngine {
 		gl.texSubImage2D(gl.TEXTURE_2D, 0, p.x, p.y, p.w, p.h, gl.RGBA, gl.FLOAT, p.data);
 	}
 
-	private uploadField(data: Float32Array | null): void {
+	private uploadField(f: Float32Array | FieldData | null): void {
 		const gl = this.gl;
 		const { w, h } = this;
-		if (!data) {
+		if (!f) {
 			if (this.texField) {
 				gl.deleteTexture(this.texField);
 				this.texField = null;
 			}
 			return;
 		}
+		const data = f instanceof Float32Array ? f : f.data;
+		const fw = f instanceof Float32Array ? w : f.w;
+		const fh = f instanceof Float32Array ? h : f.h;
 		if (!this.texField) {
 			const tex = gl.createTexture()!;
 			gl.bindTexture(gl.TEXTURE_2D, tex);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+			// LINEAR so a lower-resolution field interpolates smoothly when upsampled
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 			this.texField = tex;
 		}
 		gl.bindTexture(gl.TEXTURE_2D, this.texField);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data);
+		// the static field is a 2-channel normal (nx, ny): store RG32F rather than
+		// RGBA32F, halving its memory and upload for the same data
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, fw, fh, 0, gl.RG, gl.FLOAT, data);
 	}
 
 	dispose(): void {
@@ -698,6 +771,7 @@ export class CAEngine {
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.resTex);
 		gl.uniform1i(this.loc(this.blitProg, 'u_tex'), 0);
+		gl.uniform1i(this.loc(this.blitProg, 'u_filter'), this.upsample);
 		gl.bindVertexArray(this.vao);
 		gl.drawArrays(gl.TRIANGLES, 0, 3);
 	}

@@ -111,6 +111,22 @@ export interface LivePatch {
 	data: Float32Array;
 }
 
+/** A static field at its own (possibly lower) resolution; see `Material.field`. */
+export interface FieldData {
+	data: Float32Array;
+	w: number;
+	h: number;
+}
+
+/**
+ * How the resolve texture is upsampled to the canvas — a rendering choice only
+ * (the sim is unaffected). `linear` = hardware smooth; `nearest` = grid pixels
+ * (crisp); `cubic` = Catmull-Rom (sharper than linear, mild ringing); `lanczos`
+ * = Lanczos-3 (sharpest, more ringing). `cubic`/`lanczos` are reconstructed in
+ * the blit shader (WebGL hardware filtering only offers NEAREST/LINEAR).
+ */
+export type UpsampleMode = 'linear' | 'nearest' | 'cubic' | 'lanczos';
+
 export interface LiveHandle {
 	tick(): LivePatch | null;
 	/**
@@ -162,8 +178,12 @@ export interface Material {
 	speed?: number;
 	/** Builds the initial RGBA state (type, age, heading/density, aux). */
 	seed?(ctx: SeedCtx): Float32Array;
-	/** Optional static single-channel field uploaded as `u_field` (e.g. a distance field). */
-	field?(ctx: SeedCtx): Float32Array;
+	/**
+	 * Optional static 2-channel (nx, ny) field uploaded as `u_field`, sampled with
+	 * LINEAR. Return a bare `Float32Array` for a full-grid field, or `{data,w,h}` to
+	 * provide it at lower resolution (a smooth direction field rarely needs full res).
+	 */
+	field?(ctx: SeedCtx): Float32Array | FieldData;
 	/**
 	 * Optional CPU-driven live sim: `start` returns the initial full state and a
 	 * handle whose `tick` returns a sub-rectangle patch each frame. The engine
