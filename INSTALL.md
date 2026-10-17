@@ -57,6 +57,19 @@ rebuild and re-run the checks below.
   - `emitter`: source only, does not block. Only `goo` emits from it.
 - `data-bio-group` — optional; elements sharing this id share one automaton.
   Omit it and every element is independent.
+- `data-shape` — optional substrate outline: `rect` (default), `circle`,
+  `polygon`, `star`, or `text`. `text` uses the element's real rendered glyphs
+  (its CSS font, wrapping, and `text-transform`) as the substrate, so growth
+  starts at letter edges instead of the box:
+
+```html
+<h1 data-bio="spikes" data-shape="text">spikes</h1>
+```
+
+With `spikes`, the `inset` param (CSS px; also a slider in the demo) offsets the
+substrate: positive pulls it inward, hiding the spike bases behind the glyph
+ink, negative pushes it outward. Text strokes have to be thick enough to survive
+a large inset.
 
 `scan()` registers `[data-bio], .bio` by default. You can also call
 `bio.register(el, { material, group, mode })` yourself.

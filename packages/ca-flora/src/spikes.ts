@@ -325,6 +325,7 @@ export const spikes: Material = {
 		{ key: 'drift', label: 'snake / drift', min: 0, max: 3, step: 0.05, value: 0, kind: 'look' },
 		{ key: 'driftScale', label: 'drift scale', min: 2, max: 32, step: 1, value: 10, kind: 'look' },
 		{ key: 'spacing', label: 'seed spacing', min: 1, max: 32, step: 1, value: 4, reset: true },
+		{ key: 'inset', label: 'shape inset (−out / +in)', min: -16, max: 24, step: 1, value: 0, reset: true, kind: 'structure' },
 		{ key: 'seedChance', label: 'seed density', min: 0.05, max: 1, step: 0.05, value: 0.5, reset: true, kind: 'structure' },
 		{ key: 'dirs', label: 'growth directions', min: 8, max: 48, step: 4, value: 28, kind: 'look' },
 		{ key: 'style', label: 'style (bone/metal/gold/neon/ice)', min: 0, max: 4, step: 1, value: 0, kind: 'look' },

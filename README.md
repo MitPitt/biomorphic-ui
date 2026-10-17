@@ -95,7 +95,13 @@ engine.wake();               // re-relax a settled sim
 
 Markup conventions: `data-bio` selects the material, `data-bio-group` opts an
 element into coupling (default is one group per element), and `data-bio-mode` is
-`active` / `wall` / `emitter`.
+`active` / `wall` / `emitter`. `data-shape` selects the substrate outline:
+`rect` (default), `circle`, `polygon`, `star`, or `text` — text rasterizes the
+element's rendered glyphs (actual font, wrapping, case transform) instead of its
+box, so growth starts on the letters themselves. Spikes also exposes an `inset`
+param (CSS px, positive = inward, negative = outward) that offsets the substrate:
+raising it on text pulls the spike bases under the glyphs, hiding the jagged
+grid-aligned inner edge.
 
 ## Plan / status
 

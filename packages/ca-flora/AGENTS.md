@@ -38,6 +38,14 @@
   and crown attractors inside substrate are dropped so they don't keep tugging
   limbs into the wall. Roots anchor only on `active` cells, but their outward normal
   sums over *all* walls, so growth rounds an inert obstacle.
+- **Shape inset (spikes `inset`, CSS px).** The engine offsets every target's
+  substrate *before* seeding: analytic shapes use a signed distance threshold,
+  text samples a distance field built from its glyph mask. Positive = inward
+  (erode), negative = outward (dilate), and the runtime's `neighborAura` combines
+  as its opposite. On text, a positive inset pulls the seed rim under the glyphs,
+  so the grid-jagged spike bases are hidden by the text; thin strokes cannot
+  survive more than roughly half their stroke width. The inset joins the field
+  key, so moving it re-rasterizes and re-grows.
 - **Reach fields quantize growth direction to the stencil.** The Spikes field
   advances one grid step at a time, so a spike tip can only point along a step
   direction: with the bare 8-neighbourhood it snaps to the 8 lattice rays

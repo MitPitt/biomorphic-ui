@@ -47,6 +47,15 @@ borders/growth on DOM elements (Astro + WebGL2). An npm-workspaces monorepo:
 - `packages/ca-core/src/types.ts` — `Material`, `ParamDef` (with `kind`), `ParamSection`
   (demo panel grouping + `fixed` pins), `settle`, `LivePatch`, `SeedCtx`.
 - `packages/ca-core/src/shapes.ts` — analytic substrate shapes (rect/circle/polygon/star) + CSS sync.
+- `packages/ca-core/src/text.ts` — `data-shape="text"` glyph masks: measure each
+  character with a DOM Range (so wrapping, inline styles and letter-spacing come
+  from real layout), draw it into an offscreen canvas with the computed font and
+  `text-transform`, then sample alpha per grid cell. No font file or parser; the
+  browser's own text layout is the source of truth. The mask key joins the
+  engine's field key, so changed text/font/position rebuilds the static field.
+  For an outward shape offset the mask canvas is padded by that offset (and
+  distance fields are built on the padded mask), so dilation is not clipped at
+  the text box edge.
 - `packages/ca-core/src/fields.ts` — shared `distanceField`, `boxBlur`, `normalField`, `chamfer`.
 - `packages/ca-flora/src/reach.ts` — the shared reach-field growth stencil (`REACH_OFFSETS`,
   `snapDirs`, GLSL text). Used by both the Spikes shader and the Tree `spikes base` CPU port.

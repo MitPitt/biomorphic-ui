@@ -1,5 +1,6 @@
 import { BLIT_FS, BUILTIN_UNIFORMS, declaredUniforms, VERT } from './glsl';
-import { applyShapeCss, insideShape, shapeSpecOf } from './shapes';
+import { applyShapeCss, insideShape, shapeSpecOf, signedDistanceShape } from './shapes';
+import { textMaskHas, textMaskOf } from './text';
 import type { ActivityMode, FieldData, LiveHandle, LivePatch, Material, Occupancy, SeedCtx, TargetSpec, UpsampleMode } from './types';
 
 /** `UpsampleMode` -> the blit shader's `u_filter` value. */
@@ -394,6 +395,10 @@ export class CAEngine {
 		const cell = this.cellCss;
 		const scrX = window.scrollX;
 		const scrY = window.scrollY;
+		// A material may expose a shape inset (CSS px): positive pushes the
+		// substrate inward (hiding a text target's bases behind its glyphs),
+		// negative pushes it outward.
+		const inset = this.params.inset ?? 0;
 		let key = 2166136261;
 		const mix = (v: number): void => { key ^= v | 0; key = Math.imul(key, 16777619); };
 		const paint = (el: HTMLElement, mode: ActivityMode, own: boolean): void => {
@@ -407,24 +412,41 @@ export class CAEngine {
 			// field inputs: geometry + whether this box is substrate (emitter is not)
 			mix(left); mix(top); mix(right); mix(bottom);
 			mix(mode === 'emitter' ? 0 : 1); mix(own ? 1 : 0);
-			mix(spec.kind === 'rect' ? 0 : spec.kind === 'circle' ? 1 : spec.kind === 'polygon' ? 2 : 3);
+			mix(spec.kind === 'rect' ? 0 : spec.kind === 'circle' ? 1 : spec.kind === 'polygon' ? 2 : spec.kind === 'star' ? 3 : 4);
 			mix(spec.sides ?? 6); mix(spec.points ?? 5);
 			const cx = (left + right) / 2;
 			const cy = (top + bottom) / 2;
 			// a foreign group's box is grown by the aura so we keep clear of it
 			const aura = own ? 0 : this.neighborAura;
 			mix(aura);
-			const rx = rr.width / 2 + aura;
-			const ry = rr.height / 2 + aura;
-			const x0 = Math.floor((left - aura) / cell);
-			const x1 = Math.max(Math.ceil((right + aura) / cell), x0 + 1);
-			const sy0 = Math.floor((top - aura) / cell);
-			const sy1 = Math.max(Math.ceil((bottom + aura) / cell), sy0 + 1);
+			mix(Math.round(inset * 1000));
+			const baseRx = rr.width / 2;
+			const baseRy = rr.height / 2;
+			const rx = baseRx + aura;
+			const ry = baseRy + aura;
+			// positive = inward, negative = outward, after the neighbour aura cancels
+			const offset = inset - aura;
+			const pad = Math.max(0, -offset);
+			// text targets are rasterized from their rendered glyphs, not their box;
+			// the mask's key joins the field key so a changed text/font/position
+			// rebuilds the static field even when the box itself is unchanged.
+			// `pad` is the outward-offset margin, so the glyph mask itself must cover
+			// the dilated area (otherwise dilation is clipped to the element box).
+			const glyphs = spec.kind === 'text' ? textMaskOf(el, left, top, right - left, bottom - top, pad) : null;
+			if (glyphs) mix(glyphs.key);
+			const x0 = Math.floor((left - pad) / cell);
+			const x1 = Math.max(Math.ceil((right + pad) / cell), x0 + 1);
+			const sy0 = Math.floor((top - pad) / cell);
+			const sy1 = Math.max(Math.ceil((bottom + pad) / cell), sy0 + 1);
 			for (let gx = x0; gx < x1; gx++) {
 				for (let sy = sy0; sy < sy1; sy++) {
 					const px = (gx + 0.5) * cell;
 					const py = (sy + 0.5) * cell;
-					if (!insideShape(spec, px, py, cx, cy, rx, ry)) continue;
+					if (glyphs) {
+						if (!textMaskHas(glyphs, px, py, cell, offset)) continue;
+					} else if (offset !== 0) {
+						if (signedDistanceShape(spec, px, py, cx, cy, baseRx, baseRy) < offset) continue;
+					} else if (!insideShape(spec, px, py, cx, cy, rx, ry)) continue;
 					const gy = h - 1 - sy;
 					if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
 					const i = gy * w + gx;
