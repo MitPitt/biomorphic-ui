@@ -12,6 +12,10 @@ Each rule is tuned to look good on UI-scale rectangles at 60fps.
 
 See live demo at https://biomorphic.mitpit.com/
 
+**Using this in another app?** Start with [INSTALL.md](./INSTALL.md) — it is the
+complete install/bootstrap guide. `AGENTS.md` documents the library's internals
+and is not installation documentation.
+
 ## The three rule families
 
 | Material | What it is                                                                                                  | How it runs                 |
@@ -24,9 +28,12 @@ Pick one material per page; each page's elements share that material.
 
 ## Packages
 
-An npm-workspaces monorepo. Packages ship raw TypeScript source and are aliased
-straight to `src/` (no package build step), so consume them through a
-TS-capable bundler (Vite, esbuild, Astro) and add matching path aliases.
+An npm-workspaces monorepo. Packages ship raw TypeScript source (no package build
+step), so they need a TS-capable bundler. When installed as a dependency their
+`exports` point at that source and Vite resolves them directly; the path aliases
+in this repo are for developing the demo app itself, not required for consumers.
+The goo package uses Vite asset imports (`?url` for wasm, `?raw` for WGSL), so a
+Vite-based bundler is required when using it.
 
 | Package                | Contents                                                                  |
 | ---------------------- | ------------------------------------------------------------------------- |
@@ -47,8 +54,11 @@ npm run wasm       # rebuild the goo wasm crate (needs Rust)
 
 ## Using it in your app
 
+The full consumer bootstrap (bundler requirements, SSR, canvas layering,
+verification) is in [INSTALL.md](./INSTALL.md). Minimal version:
+
 ```html
-<!-- any element you want to grow on; .sub / [data-bio] is the substrate -->
+<!-- any element you want to grow on; [data-bio] / .bio is the substrate -->
 <div class="card" data-bio="spikes" data-bio-group="hero" data-bio-mode="active">
   …
 </div>
@@ -103,6 +113,10 @@ Next up (design notes): generative frame shapes:
   shapes (the old-mobile-phone silhouette) instead of axis-aligned rectangles.
 
 ## Install
+
+Not on the npm registry yet; install from GitHub. See [INSTALL.md](./INSTALL.md)
+for the complete agent-oriented bootstrap (bundler requirements, SSR, layering,
+verification, troubleshooting).
 
 ```bash
 npm i github:MitPitt/biomorphic-ui

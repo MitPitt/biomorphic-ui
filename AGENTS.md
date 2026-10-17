@@ -1,5 +1,9 @@
 # AGENTS.md
 
+> **Installing this into a different app? Read [INSTALL.md](./INSTALL.md) instead.**
+> This file is contributor architecture; it is not install instructions. Do not
+> clone the repo just to consume the packages.
+
 Biomorphic UI: hand-engineered growth rules that look biological, rendered as
 borders/growth on DOM elements (Astro + WebGL2). An npm-workspaces monorepo:
 
