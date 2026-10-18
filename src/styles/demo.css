@@ -277,21 +277,54 @@ h1.glyph-text {
 	right: 16px;
 	z-index: 3;
 	width: 248px;
+	max-width: calc(100vw - 32px);
+	max-height: calc(100vh - 32px);
+	max-height: calc(100dvh - 32px);
 	padding: 14px;
 	background: rgba(10, 11, 13, 0.86);
 	backdrop-filter: blur(10px);
 	border: 1px solid var(--line);
 	border-radius: 12px;
 	font-size: 12px;
+	overflow: hidden;
 }
 
-#panel h3 {
-	margin: 0 0 10px;
+#panel>summary {
+	list-style: none;
+	cursor: pointer;
 	font-size: 11px;
 	letter-spacing: 0.16em;
 	text-transform: uppercase;
 	color: var(--dim);
 	font-weight: 600;
+}
+
+#panel>summary::-webkit-details-marker {
+	display: none;
+}
+
+#panel>summary::before {
+	content: "▸ ";
+	color: #5a6068;
+}
+
+#panel[open]>summary::before {
+	content: "▾ ";
+}
+
+#panel[open]>summary {
+	margin-bottom: 10px;
+}
+
+.panel-body {
+	max-height: calc(100vh - 96px);
+	max-height: calc(100dvh - 96px);
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	scrollbar-color: #30343a transparent;
+	padding-right: 4px;
 }
 
 #panel button {
@@ -388,13 +421,13 @@ h1.glyph-text {
 	max-width: 138px;
 }
 
-#panel details {
+#panel .panel-body details {
 	margin: 0 0 6px;
 	border-top: 1px solid var(--line);
 	padding-top: 4px;
 }
 
-#panel summary {
+#panel .panel-body summary {
 	cursor: pointer;
 	list-style: none;
 	color: var(--dim);
@@ -405,16 +438,16 @@ h1.glyph-text {
 	padding: 4px 0;
 }
 
-#panel summary::-webkit-details-marker {
+#panel .panel-body summary::-webkit-details-marker {
 	display: none;
 }
 
-#panel summary::before {
+#panel .panel-body summary::before {
 	content: "▸ ";
 	color: #5a6068;
 }
 
-#panel details[open]>summary::before {
+#panel .panel-body details[open]>summary::before {
 	content: "▾ ";
 }
 
@@ -443,7 +476,8 @@ h1.glyph-text {
 
 #legend {
 	display: flex;
-	gap: 10px;
+	flex-wrap: wrap;
+	gap: 6px 10px;
 	margin: 0 0 12px;
 	font-size: 10px;
 	letter-spacing: 0.08em;
