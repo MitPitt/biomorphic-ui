@@ -14,6 +14,9 @@ import type {
 /** `UpsampleMode` -> the blit shader's `u_filter` value. */
 const UPSAMPLE: Record<UpsampleMode, number> = { linear: 0, nearest: 1, cubic: 2, lanczos: 3 };
 
+const EMPTY_STATE = new Float32Array([0, -1e9, 0, 0]);
+const EMPTY_RESOLVE = new Float32Array([-1, 0, 0, 0]);
+
 export type Params = Record<string, number>;
 
 export interface CoreOptions {
@@ -141,7 +144,6 @@ export class GLEngine {
 		if (!gl.getExtension('EXT_color_buffer_float')) {
 			console.warn('EXT_color_buffer_float unavailable; float render targets may fail');
 		}
-		gl.getExtension('OES_texture_float_linear');
 
 		this.material = material;
 		this.params = paramsFrom(material);
@@ -497,6 +499,29 @@ export class GLEngine {
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
 		this.resTex = rt;
 		this.resFbo = this.makeFbo(rt);
+
+		for (const [label, fbo] of [
+			['state A', this.fboA],
+			['state B', this.fboB],
+			['resolve', this.resFbo],
+		] as const) {
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+			const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+			if (status !== gl.FRAMEBUFFER_COMPLETE) {
+				const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+				throw new Error(
+					`${label} render target incomplete (0x${status.toString(16)}) at ${w}x${h}; ` +
+						`MAX_TEXTURE_SIZE=${max}. Check EXT_color_buffer_float and the cell budget.`,
+				);
+			}
+		}
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboA);
+		gl.clearBufferfv(gl.COLOR, 0, EMPTY_STATE);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
+		gl.clearBufferfv(gl.COLOR, 0, EMPTY_STATE);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.resFbo);
+		gl.clearBufferfv(gl.COLOR, 0, EMPTY_RESOLVE);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	}
 
 	private makeStateTexture(w: number, h: number): WebGLTexture {
@@ -628,7 +653,7 @@ export class GLEngine {
 			this.texField = tex;
 		}
 		gl.bindTexture(gl.TEXTURE_2D, this.texField);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, fw, fh, 0, gl.RG, gl.FLOAT, data);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, fw, fh, 0, gl.RG, gl.FLOAT, data);
 	}
 
 	/** Exposed for the main wrapper's live setMasks shortcut. */

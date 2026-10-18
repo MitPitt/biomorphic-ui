@@ -55,6 +55,6 @@ export type WorkerRequest =
 
 /** Messages the bio worker sends back. */
 export type WorkerResponse =
-	| { t: 'ready'; id: string }
+	| { t: 'ready'; id: string; maxTextureSize: number }
 	| { t: 'status'; id: string; settled: boolean }
 	| { t: 'error'; id: string; message: string };

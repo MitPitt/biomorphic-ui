@@ -25,6 +25,19 @@ interface WorkerScope {
 export function startBioWorker(registry: MaterialRegistry): void {
 	const scope = self as unknown as WorkerScope;
 	const engines = new Map<string, GLEngine>();
+	let probedMax = 0;
+	const maxTextureSize = (): number => {
+		if (probedMax) return probedMax;
+		try {
+			const gl = new OffscreenCanvas(1, 1).getContext('webgl2');
+			const max = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 0;
+			gl?.getExtension('WEBGL_lose_context')?.loseContext();
+			probedMax = max || 4096;
+		} catch {
+			probedMax = 4096;
+		}
+		return probedMax;
+	};
 	// One live-tissue map per bio instance, shared by every tree group in this
 	// worker (all such groups are assigned to one sticky worker by the runtime).
 	const occupancies = new Map<string, Occupancy>();
@@ -87,7 +100,7 @@ export function startBioWorker(registry: MaterialRegistry): void {
 		try {
 			switch (m.t) {
 				case 'hello':
-					scope.postMessage({ t: 'ready', id: m.id });
+					scope.postMessage({ t: 'ready', id: m.id, maxTextureSize: maxTextureSize() });
 					break;
 				case 'create':
 					cancelled.delete(m.id);

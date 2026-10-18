@@ -164,9 +164,11 @@ export function textMaskOf(el: HTMLElement, x: number, y: number, w: number, h: 
 	let scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 	const area = Math.max(1, mw * mh);
 	const maxPixels = 4_000_000;
+	const maxDim = 4096;
 	if (area * scale * scale > maxPixels) scale = Math.sqrt(maxPixels / area);
-	const pw = Math.max(1, Math.round(mw * scale));
-	const ph = Math.max(1, Math.round(mh * scale));
+	scale = Math.min(scale, maxDim / Math.max(1, mw), maxDim / Math.max(1, mh));
+	const pw = Math.max(1, Math.min(maxDim, Math.round(mw * scale)));
+	const ph = Math.max(1, Math.min(maxDim, Math.round(mh * scale)));
 
 	const canvas = document.createElement('canvas');
 	canvas.width = pw;
@@ -185,7 +187,11 @@ export function textMaskOf(el: HTMLElement, x: number, y: number, w: number, h: 
 			const baseline = g.top + (g.lineHeight - (g.ascent + g.descent)) / 2 + g.ascent;
 			ctx.fillText(g.ch, g.x * scale, baseline * scale);
 		}
-		mask.data = ctx.getImageData(0, 0, pw, ph).data;
+		try {
+			mask.data = ctx.getImageData(0, 0, pw, ph).data;
+		} catch (err) {
+			console.error('[bio] text mask read failed', err);
+		}
 	}
 	cache.set(el, mask);
 	return mask;

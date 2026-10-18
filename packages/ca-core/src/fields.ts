@@ -84,7 +84,7 @@ export function boxBlur(
  * Smoothed outward-normal field. The distance field is blurred before differencing
  * so the direction fans smoothly around convex corners instead of flipping across
  * the medial-axis shock. Returns a tightly packed (nx, ny) array — two floats per
- * cell, matching the RG32F `u_field` texture the engine uploads.
+ * cell, matching the RG16F `u_field` texture the engine uploads.
  */
 export function normalField(ctx: SeedCtx, radius: number): Float32Array {
 	const { w, h } = ctx;

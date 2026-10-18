@@ -360,7 +360,7 @@ Package-specific detail lives next to the code — goo internals in
   via `texture(u_field, (P+0.5)/textureSize(u_state))`, not `texelFetch`), which took the
   build from ~290 ms to ~18 ms. Other cheap wins: only `texA` is uploaded (a shader step
   fully writes `texB` before its first read, and the live seam only uses `texA`); `u_field`
-  is a tightly packed 2-channel `RG32F` (was RGBA32F); `boxBlur` uses precomputed clamp
+  is a tightly packed 2-channel `RG16F` (was RG32F, then RGBA32F); `boxBlur` uses precomputed clamp
   index tables instead of per-element `Math.min/max`; `seedEdges` *dilates the source cells*
   instead of testing every free cell × 8 (O(sources), order-preserving so seeds are
   unchanged); and `refreshActivity` resets a shader sim rather than building masks twice.
@@ -369,6 +369,21 @@ Package-specific detail lives next to the code — goo internals in
   cost all scale with it (8M cells = 128MB RGBA32F per state texture, ×2 for ping-pong,
   *per group*). Instant mode runs the whole `settleAt`-step sim in one shot, so its latency
   scales the same way — lower the budget, not the settle bound.
+- **Mobile GPU portability.** Two WebGL2 assumptions differed on Android and are now
+  avoided. `u_field` is **RG16F**, not RG32F: half-float linear filtering is core in
+  WebGL2, while 32-bit float linear filtering needs `OES_texture_float_linear`, which many
+  mobile GPUs don't expose — the normal field then samples nearest/zero, and spikes come
+  out with the 8-direction (45°-cut) cones or don't grow. Each group's grid is also clamped
+  to the worker-probed `MAX_TEXTURE_SIZE` (the layout coarsens its cell until `w,h` fit):
+  a document-sized grid is tall and narrow on a phone, can fit the cell budget yet exceed
+  one texture dimension, and an incomplete state texture samples as zero — which the
+  resolve pass reads as tissue and paints as a **full-screen tint** (pale blue in the
+  metal/ice styles). `createTargets` now checks each FBO is complete and throws an
+  actionable error (grid, `MAX_TEXTURE_SIZE`, extension) instead of drawing garbage.
+  The text mask is likewise capped at 4096 px per dimension (a tall text block × dpr can
+  exceed the canvas limit and throw in `getImageData`), and a failed scene collection
+  posts an empty reset while the state starts at the empty sentinel — so a scene/mask
+  failure clears the canvas instead of leaving the zero-state tint.
 - **Aliasing vs `boxBlur`; upsample filter.** `boxBlur` smooths the *growth-direction*
   field (it shapes spikes), not the rendered edge. The rendered edge quality is the blit's
   reconstruction of the resolve texture, so `engine.setUpsample(mode)` picks it (a

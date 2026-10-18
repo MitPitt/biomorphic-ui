@@ -26,15 +26,27 @@ export function layoutFor(
 	dpr: number,
 	cellSize: number,
 	maxCells: number,
+	maxDim = 0,
 ): GridLayout {
-	const bw = Math.max(1, Math.round(cssW * dpr));
-	const bh = Math.max(1, Math.round(cssH * dpr));
-	const area = bw * bh;
+	const fullW = Math.max(1, Math.round(cssW * dpr));
+	const fullH = Math.max(1, Math.round(cssH * dpr));
+	const area = fullW * fullH;
 	const minCell = Math.sqrt(area / Math.max(1, maxCells));
-	const cell = Math.max(cellSize, minCell);
-	const w = Math.max(8, Math.round(bw / cell));
-	const h = Math.max(8, Math.round(bh / cell));
-	return { cssW, cssH, dpr, bw, bh, w, h, cellCss: bw / w / dpr };
+	let cell = Math.max(cellSize, minCell);
+	let w = Math.max(8, Math.round(fullW / cell));
+	let h = Math.max(8, Math.round(fullH / cell));
+	let bw = fullW;
+	let bh = fullH;
+	if (maxDim > 0) {
+		maxDim = Math.max(8, maxDim);
+		cell = Math.max(cell, Math.ceil(Math.max(fullW, fullH) / maxDim));
+		w = Math.max(8, Math.round(fullW / cell));
+		h = Math.max(8, Math.round(fullH / cell));
+		const scale = Math.min(1, maxDim / fullW, maxDim / fullH);
+		bw = Math.max(1, Math.round(fullW * scale));
+		bh = Math.max(1, Math.round(fullH * scale));
+	}
+	return { cssW, cssH, dpr, bw, bh, w, h, cellCss: cssW / w };
 }
 
 /** One rasterizable element, fully precomputed on the main thread. */

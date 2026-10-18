@@ -59,6 +59,7 @@ export class OffscreenEngine implements BioEngine {
 	private _manual = false;
 	private _lastW = 0;
 	private _lastH = 0;
+	private maxTextureSize = 0;
 	private readonly bioId: string;
 	private readonly token: number;
 	private readonly collideNeighbors: boolean;
@@ -102,8 +103,13 @@ export class OffscreenEngine implements BioEngine {
 			const m = e.data as WorkerResponse;
 			if (!m || m.id !== this.id) return;
 			if (m.t === 'status') this._settled = m.settled;
-			else if (m.t === 'ready') this.create();
-			else if (m.t === 'error') console.error('[bio worker]', m.message);
+			else if (m.t === 'ready') {
+				if (m.maxTextureSize) this.maxTextureSize = m.maxTextureSize;
+				this.createLayout = this.fit();
+				this._lastW = this.createLayout.w;
+				this._lastH = this.createLayout.h;
+				this.create();
+			} else if (m.t === 'error') console.error('[bio worker]', m.message);
 		};
 		this.worker.addEventListener('message', this.onMessage);
 
@@ -139,6 +145,11 @@ export class OffscreenEngine implements BioEngine {
 			console.error('[bio worker] canvas transfer failed', err);
 			return;
 		}
+		const needsReset = this.pending.some((m) => m.t === 'reset' || m.t === 'refresh' || m.t === 'fit');
+		for (let i = this.pending.length - 1; i >= 0; i--) {
+			const t = this.pending[i].t;
+			if (t === 'reset' || t === 'refresh' || t === 'fit') this.pending.splice(i, 1);
+		}
 		this.worker.postMessage(
 			{
 				t: 'create',
@@ -160,6 +171,7 @@ export class OffscreenEngine implements BioEngine {
 		);
 		for (const msg of this.pending) this.worker.postMessage(msg);
 		this.pending.length = 0;
+		if (needsReset) this.reset();
 	}
 
 	get material(): Material {
@@ -240,7 +252,7 @@ export class OffscreenEngine implements BioEngine {
 		this.canvas.style.left = '0px';
 		this.canvas.style.width = `${cssW}px`;
 		this.canvas.style.height = `${cssH}px`;
-		this.createLayout = layoutFor(cssW, cssH, dpr, this._cellSize, this.maxCells);
+		this.createLayout = layoutFor(cssW, cssH, dpr, this._cellSize, this.maxCells, this.maxTextureSize);
 		return this.createLayout;
 	}
 
@@ -248,7 +260,12 @@ export class OffscreenEngine implements BioEngine {
 		if (typeof this._params.neighborAura === 'number') {
 			this.neighborAura = this._params.neighborAura;
 		}
-		return collectScene(layout, this.targets(), this.obstacles(), this._params, this.neighborAura);
+		try {
+			return collectScene(layout, this.targets(), this.obstacles(), this._params, this.neighborAura);
+		} catch (err) {
+			console.error('[bio] scene collection failed', err);
+			return { ...layout, targets: [], neighborAura: this.neighborAura };
+		}
 	}
 
 	reset(): void {
