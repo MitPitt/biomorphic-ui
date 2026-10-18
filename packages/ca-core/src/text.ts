@@ -40,7 +40,7 @@ interface Glyph {
 	ascent: number;
 	descent: number;
 	font: string;
-	/** Glyph scale that makes the canvas font match the rendered line box (mobile text autosizing). */
+	/** DOM advance / canvas advance, compensating mobile font autosizing. */
 	k: number;
 }
 
@@ -104,6 +104,8 @@ function glyphsOf(el: HTMLElement, x: number, y: number): { glyphs: Glyph[]; key
 			const fontSize = parseFloat(style.fontSize) || 16;
 			const ascent = metrics.fontBoundingBoxAscent ?? metrics.actualBoundingBoxAscent ?? fontSize * 0.8;
 			const descent = metrics.fontBoundingBoxDescent ?? metrics.actualBoundingBoxDescent ?? fontSize * 0.2;
+			const spacing = parseFloat(style.letterSpacing);
+			const letter = Number.isFinite(spacing) ? spacing : 0;
 			const text = node.data;
 			for (let i = 0; i < text.length; ) {
 				const cp = text.codePointAt(i)!;
@@ -131,7 +133,12 @@ function glyphsOf(el: HTMLElement, x: number, y: number): { glyphs: Glyph[]; key
 						key = Math.imul(key, 16777619);
 						key ^= Math.round(r.height * 10);
 						key = Math.imul(key, 16777619);
-						const k = Math.min(2.5, Math.max(0.75, r.height / Math.max(1, ascent + descent)));
+						// The DOM advance is the used (possibly autosized) font; the canvas
+						// font string is the computed one. Scale by their ratio so the mask
+						// matches the rendered text (letter-spacing is included in r.width).
+						const natural = scratch.measureText(ch).width;
+						const advance = r.width - letter;
+						const k = natural > 0.01 && advance > 0 ? Math.min(3, Math.max(0.5, advance / natural)) : 1;
 						glyphs.push({ ch, x: gx, top, lineHeight: r.height, ascent, descent, font, k });
 					}
 				}
@@ -189,10 +196,12 @@ export function textMaskOf(el: HTMLElement, x: number, y: number, w: number, h: 
 			}
 			const ascent = g.ascent * g.k;
 			const descent = g.descent * g.k;
-			const baseline = g.top + (g.lineHeight - (ascent + descent)) / 2 + ascent;
+			const lineHeight = Math.max(g.lineHeight, ascent + descent);
+			const baseline = g.top + (lineHeight - (ascent + descent)) / 2 + ascent;
+			const glyphScale = scale * g.k;
 			ctx.save();
 			ctx.translate(g.x * scale, baseline * scale);
-			ctx.scale(g.k, g.k);
+			ctx.scale(glyphScale, glyphScale);
 			ctx.fillText(g.ch, 0, 0);
 			ctx.restore();
 		}

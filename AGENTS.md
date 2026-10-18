@@ -386,10 +386,12 @@ Package-specific detail lives next to the code — goo internals in
   failure clears the canvas instead of leaving the zero-state tint. Spikes also generate
   the reach stencil **arithmetically** (`d2 <= cutoff` over `dy,dx`) instead of dynamically
   indexing a `const ivec2[48]`; some Android GLES compilers miscompile the latter, which
-  shows up on device as the bare 8-direction (45°) growth. Text masks scale each glyph by
-  the rendered line-box / font-metric ratio: Android font autosizing renders glyphs larger
-  than `getComputedStyle().fontSize`, so an unscaled canvas mask is a smaller copy of the
-  DOM text.
+  shows up on device as the bare 8-direction (45°) growth. Text masks draw each glyph at
+  `mask.scale * k`: the mask canvas is built at up to 2× (dpr) resolution and sampled with
+  `mask.scale`, so drawing the glyph at the unscaled CSS font size made the substrate a
+  **half-size copy** of the DOM text on every dpr>1 phone (desktop dpr=1 hid it). `k` is
+  the measured DOM advance / canvas advance ratio, which also compensates Android font
+  autosizing (the DOM renders text larger than `getComputedStyle().fontSize`).
 - **Aliasing vs `boxBlur`; upsample filter.** `boxBlur` smooths the *growth-direction*
   field (it shapes spikes), not the rendered edge. The rendered edge quality is the blit's
   reconstruction of the resolve texture, so `engine.setUpsample(mode)` picks it (a
