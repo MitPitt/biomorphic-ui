@@ -27,7 +27,8 @@ borders/growth on DOM elements (Astro + WebGL2). An npm-workspaces monorepo:
   counters show a group's rebuild count (used by the "group-relative reflow"
   `<details>`, which opens in flow to grow the gap between two groups and shows that a
   settled group is *translated* — a jigsaw piece — rather than re-seeded).
-- `packages/ca-core/src/engine.ts` — WebGL2 engine. Ping-pong RGBA32F state, optional static
+- `packages/ca-core/src/engine-core.ts` (`GLEngine`, DOM-free) + `offscreen.ts`
+  (`OffscreenEngine`, main-thread facade) — WebGL2 engine. Ping-pong RGBA32F state, optional static
   `u_field` texture, resolve → blit. Also supports a **live** material: if
   `material.live` exists, the engine skips the shader sim and instead calls
   `live.handle.tick()` each frame, uploading the returned sub-rect patch via
@@ -74,8 +75,9 @@ borders/growth on DOM elements (Astro + WebGL2). An npm-workspaces monorepo:
   `data-bio-mode` (`active` = both | `emitter` = source only | `wall` = obstacle).
   Each group gets a seeded RNG (mulberry32) so
   rebuilds reproduce.
-- `packages/ca-core/src/index.ts` — core's public entry (`createBio`, `CAEngine`,
-  types, and the shared field/glsl helpers the materials import).
+- `packages/ca-core/src/index.ts` — core's public entry (`createBio`,
+  `OffscreenEngine`, `startBioWorker`, types, and the shared field/glsl helpers
+  the materials import).
 
 ### Substrate modes (obstacle vs source)
 `SeedCtx` carries two **independent** masks built from each element's
@@ -93,7 +95,7 @@ normal sums over *all* walls so growth rounds it), and goo `computeEmitters` (We
 cells touching `active`, skipping the source's own cells so emitter-only emits just
 outside its rim).
 
-Toggling routes through `CAEngine.refreshActivity()`: a shader sim (spikes) must
+Toggling routes through `engine.refreshActivity()`: a shader sim (spikes) must
 `reset()` (its tissue is coupled), as must a live backend that lacks the hook (tree).
 A live backend that implements `LiveHandle.setMasks(substrate, active)` updates its
 static collision field *and* its emitter set in place, so **any** mode change
@@ -125,7 +127,7 @@ A material may also expose **engine knobs as its own params**: the engine adopts
 `reset()` if the material declares them, so an ordinary slider drives the engine and the
 knob only appears on materials that use it (flora), not on every page.
 
-### Two execution models
+### Two execution models (both in a worker)
 - **Shader sim** (spikes): local field CA, one fragment pass per tick.
 - **Live CPU** (tree): `live.start(ctx)` returns `{ initial, handle }`; `handle.tick()`
   advances the algorithm and returns a changed-rect `LivePatch`.
@@ -138,6 +140,42 @@ knob only appears on materials that use it (flora), not on every page.
   whole sim, emission, culling and metaball splat run on the GPU; only the
   density field is read back (async, throttled, non-blocking). Falls back to the
   wasm handle if `navigator.gpu` is missing or init fails. `backend` param picks.
+
+### Off-main-thread engines (worker + OffscreenCanvas)
+- `packages/ca-core/src/engine-core.ts` (`GLEngine`) is the **DOM-free** sim/render
+  core. `offscreen.ts` (`OffscreenEngine`) is the main-thread facade: it measures
+  the DOM into a serializable `RasterScene` (`scene.ts` — rects, shape specs, text
+  glyph masks) and posts it to a worker, which runs the core.
+- **Every material runs in a worker.** `createBio({ worker })` is required; the
+  app's worker entry (`src/lib/bio.worker.ts`) imports the **same material
+  registry** and calls `startBioWorker(materials)`. Browsers without
+  `transferControlToOffscreen` are unsupported (no main-thread engine).
+- The worker rasterizes the scene, builds the distance/normal field, seeds, ticks
+  the sim (shader or live) and renders to the transferred OffscreenCanvas. The
+  main thread only measures rects and (cached) glyph masks, so a reset/field
+  build can't stall the page. `data-reseed` counters still patch the facade's
+  `reset`.
+- **Ready handshake:** wait for a `hello`→`ready` reply before calling
+  `transferControlToOffscreen`; transferring before the worker module evaluates
+  can leave the placeholder canvas without a bitmap.
+- **Worker pool:** Chrome silently loses the **oldest WebGL context** when one
+  worker holds too many, so groups are spread over workers with at most
+  `MAX_GROUPS_PER_WORKER = 4` each (7 demo groups → 2 workers). Don't put all
+  groups in one worker.
+- **Live tissue sharing (tree):** all `usesOccupancy` groups are assigned to one
+  **sticky worker**, which owns the shared `Occupancy` map keyed by the bio id.
+  (It cannot be split across the pool or the crown-shyness map would fork.) The
+  sticky worker therefore holds all tree groups; >4 warns about context loss.
+- **Mode flips:** `OffscreenEngine.refreshActivity` posts a `refresh` message;
+  the worker calls `GLEngine.refreshActivity(scene)`, so goo's `setMasks` keeps
+  the fluid running in place (tree has no hook and resets).
+- **Render on demand:** a settled, static field is not re-resolved/re-blitted
+  every frame (the rAF loop keeps running but does no GL work). `Material.animated`
+  (spikes style metal/gold) keeps rendering because its look animates from
+  `u_frame`. This is the big idle-cost win on mobile.
+- `OffscreenEngine.refit()` only resets when the fitted grid really changed, so
+  mobile URL-bar show/hide doesn't re-seed. Worker `settled` status is mirrored
+  on the main facade for the translate-vs-rebuild decision.
 
 ## How to add a new bio-rule material
 1. Create `packages/ca-<family>/src/<name>.ts` exporting a `Material`.
@@ -230,7 +268,7 @@ Package-specific detail lives next to the code — goo internals in
 - **Neighbours as obstacles (independent groups, one mass).** Independent groups still
   overlap when close: group A's grid spans the whole document but rasterizes only its
   *own* targets, so a nearby box B is invisible to A and A's growth spills over it. Fix:
-  `CAEngine` takes an `obstacles()` provider (runtime supplies every element owned by a
+  `createBio` takes an `obstacles()` provider (runtime supplies every element owned by a
   *different* group), rasterized as **substrate only, never as `active`** — so it blocks
   but never seeds. Because that injection is exactly how an inert `wall` element already
   behaves, no material changed: spikes' `seedEdges`/tree's `chooseRoots` still require
@@ -249,7 +287,7 @@ Package-specific detail lives next to the code — goo internals in
   paint into a cell owned by a foreign token, and claim their own cells (`paint`/birth/
   leaves). It's monotonic and same-thread, so two trees meet and never both claim a cell —
   while still **not** coupling reflow (a move doesn't rebuild the other; it just re-samples
-  the live map on its next reset). Shimmed per-engine — a standalone `CAEngine` gets none,
+  the live map on its next reset). Shimmed per-engine — a standalone engine gets none,
   and only materials that opt in (`Material.usesOccupancy`, i.e. tree) size/claim/scan it,
   so spike-only pages pay nothing.
   **`neighborAura`** (px, `createBio`) adds a purely *cross-group* stand-off: a foreign
@@ -264,10 +302,10 @@ Package-specific detail lives next to the code — goo internals in
 - **Settled groups translate rigidly (jigsaw move).** A settled group's field is
   self-contained in its state texture, so when the runtime's rect diff sees a **uniform
   pure translation** (every target keeps its size and moves by the same delta) it does
-  *not* rebuild: it calls `CAEngine.translateBy(dx, dy)`, which merely CSS-translates the
+  *not* rebuild: it calls `engine.translateBy(dx, dy)`, which merely CSS-translates the
   group's canvas, so the finished shape slides as one piece and the group's re-seed counter
   stays put. Any other change — a resize, members diverging, or a sim that hasn't settled
-  (`CAEngine.settled`) — falls back to a full `reset()`, and `reset()`/`resize()` clear the
+  (`engine.settled`) — falls back to a full `reset()`, and `reset()`/`resize()` clear the
   transform. This needs the document RO to actually fire, so a demo page must **not** pin
   `html, body { height: 100% }`: a viewport-sized root never resizes when content grows, so
   the translate would never trigger. `SeedCtx.ownSubstrate` (the group's *own* box, foreign
@@ -276,8 +314,8 @@ Package-specific detail lives next to the code — goo internals in
   coupled, so it always rebuilds.
 
 - **Explicit freeze/unfreeze; a group that resizes itself.** Auto-settle is a
-  *derived* freeze (`CAEngine.settled`); apps can also hold a group deliberately via
-  `CAEngine.freeze()` / `unfreeze()` / `frozen` (runtime `bio.freeze / unfreeze /
+  *derived* freeze (`engine.settled`); apps can also hold a group deliberately via
+  `engine.freeze()` / `unfreeze()` / `frozen` (runtime `bio.freeze / unfreeze /
   frozen`). `frozen = manualHold || settled`, and the runtime's rigid-translate path
   now keys off `frozen` (not `settled`), so a **partly-grown** group can be frozen
   and still slide as one piece. A *manual* freeze additionally makes the runtime
@@ -326,14 +364,14 @@ Package-specific detail lives next to the code — goo internals in
   index tables instead of per-element `Math.min/max`; `seedEdges` *dilates the source cells*
   instead of testing every free cell × 8 (O(sources), order-preserving so seeds are
   unchanged); and `refreshActivity` resets a shader sim rather than building masks twice.
-  The real bound is `cellBudget` (`createBio`) / `maxCells` (`CAEngine`) — the cap on each
+  The real bound is `cellBudget` (`createBio`) / `maxCells` (`engine`) — the cap on each
   group's grid (default 4M cells; was 8M). Memory, seed/field CPU, upload and per-step sim
   cost all scale with it (8M cells = 128MB RGBA32F per state texture, ×2 for ping-pong,
   *per group*). Instant mode runs the whole `settleAt`-step sim in one shot, so its latency
   scales the same way — lower the budget, not the settle bound.
 - **Aliasing vs `boxBlur`; upsample filter.** `boxBlur` smooths the *growth-direction*
   field (it shapes spikes), not the rendered edge. The rendered edge quality is the blit's
-  reconstruction of the resolve texture, so `CAEngine.setUpsample(mode)` picks it (a
+  reconstruction of the resolve texture, so `engine.setUpsample(mode)` picks it (a
   look-only toggle, also honoured on the next `createTargets`): `linear` (default; hardware
   `LINEAR` interpolates the signed coverage → smooth silhouette), `nearest` (grid pixels),
   and `cubic` (Catmull-Rom, 4 taps/axis) / `lanczos` (Lanczos-3, 6 taps/axis), which the

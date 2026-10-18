@@ -64,6 +64,18 @@ verification) is in [INSTALL.md](./INSTALL.md). Minimal version:
 </div>
 ```
 
+Every material runs off the main thread on an OffscreenCanvas, so resets,
+distance-field builds, seeding, sim ticks and GL submission can't stall the page.
+The main thread only measures element rects and glyph masks. Add a worker entry
+that uses the same material registry:
+
+```ts
+// bio.worker.ts
+import { startBioWorker } from '@biomorphic/ca-core';
+import { materials } from './materials';
+startBioWorker(materials);
+```
+
 ```ts
 import { createBio } from '@biomorphic/ca-core';
 import { materials as flora } from '@biomorphic/ca-flora';
@@ -72,10 +84,17 @@ import { materials as goo } from '@biomorphic/ca-goo';
 const bio = createBio({
   materials: { ...flora, ...goo },  // compose the families you ship
   material: 'spikes',
+  worker: () => new Worker(new URL('./bio.worker.ts', import.meta.url), { type: 'module' }),
 });
 
 bio.scan();                        // register every [data-bio], .bio element
 ```
+
+The factory may be called more than once: the runtime pools workers (at most 4
+WebGL contexts each, because Chrome loses the oldest context beyond that). Live
+tissue groups (tree) are assigned to one shared worker so they can share the
+cross-group occupancy map. Browsers without `transferControlToOffscreen` are not
+supported.
 
 Runtime API:
 

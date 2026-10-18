@@ -79,7 +79,7 @@ export interface SeedCtx {
 	/**
 	 * Substrate from THIS group's own elements only — foreign-group obstacles
 	 * excluded. Use it for anything that must be *rendered* as this group's own box,
-	 * so a settled group can translate rigidly (see `CAEngine.translateBy`) without
+	 * so a settled group can translate rigidly (see `OffscreenEngine.translateBy`) without
 	 * dragging copies of its neighbours along. `substrate` above still includes
 	 * foreign obstacles for blocking/collision.
 	 */
@@ -95,7 +95,7 @@ export interface SeedCtx {
 	occupancy?: Occupancy;
 	token?: number;
 	/**
-	 * Cross-group separation in grid cells (from `CAEngine`'s px `neighborAura`):
+	 * Cross-group separation in grid cells (from `createBio`'s px `neighborAura`):
 	 * live materials should keep this many cells clear of *foreign* tissue, so
 	 * neighbours leave a gap instead of touching (crown shyness). Own tissue is
 	 * never affected. 0 = no aura.
@@ -161,6 +161,12 @@ export interface Material {
 	sim: string;
 	/** Fragment shader that maps state -> RGBA for display (crisp, at sim resolution). */
 	resolve: string;
+	/**
+	 * True when the resolve shader animates from `u_frame` for these params (e.g.
+	 * the liquid-metal flow). A settled static field then stops being re-resolved
+	 * and re-blitted every frame; an animated look keeps rendering.
+	 */
+	animated?(params: Record<string, number>): boolean;
 	params: ParamDef[];
 	/**
 	 * Optional grouping of `params` into collapsible sections in the demo panel.

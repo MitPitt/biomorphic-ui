@@ -5,8 +5,11 @@
  * on this and are composed by the app into the registry `createBio` takes.
  */
 
-export { CAEngine } from './engine';
-export type { EngineOptions } from './engine';
+export type { BioEngine, EngineOptions } from './engine-api';
+export { OffscreenEngine, canUseOffscreen } from './offscreen';
+export type { OffscreenEngineOptions } from './offscreen';
+export { startBioWorker } from './worker';
+export type { WorkerRequest, WorkerResponse } from './offscreen-protocol';
 export { createBio } from './runtime';
 export type { Bio, CreateBioOptions, RegisterOptions } from './runtime';
 

@@ -327,7 +327,7 @@ function liveStart(ctx: SeedCtx): { initial: Float32Array; handle: { tick(): Liv
 
 	// shared live-tissue map: refuse to grow into a *foreign* group's branches, and
 	// publish our own, so independent trees meet instead of crossing. Off unless the
-	// runtime wired a grid that lines up with ours (see CAEngine/Occupancy).
+	// runtime wired a grid that lines up with ours (see Occupancy).
 	const occ = ctx.occupancy;
 	const me = ctx.token ?? 0;
 	const occOn = !!occ && me !== 0 && occ.w === w && occ.h === h;

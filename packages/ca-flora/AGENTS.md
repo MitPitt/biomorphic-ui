@@ -89,7 +89,7 @@
 
 - **Neighbours block growth (core runtime).** Independent groups no longer overlap when
   close: the runtime hands each group's engine the *other* groups' elements as inert
-  obstacles (`CAEngine` `obstacles()`, substrate-only). Spikes needed no change — they
+  obstacles (`createBio`'s `obstacles()`, substrate-only). Spikes needed no change — they
   already treat inert `wall` substrate as a block but not a `seedEdges` source — so their
   bounded reach field simply stops at a neighbour's rim. **Tree is different:** its
   branches aren't in the substrate mask and at reset a neighbour has no branches yet, so a

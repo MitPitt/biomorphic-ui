@@ -21,7 +21,12 @@ export function startDemo(): void {
 	const body = document.body;
 	const materialId = body.dataset.bioMaterial ?? "spikes";
 
-	const bio = createBio({ materials, material: materialId });
+	const bio = createBio({
+		materials,
+		material: materialId,
+		// shader sims + field builds + rendering run on an OffscreenCanvas worker
+		worker: () => new Worker(new URL("./bio.worker.ts", import.meta.url), { type: "module" }),
+	});
 	document
 		.querySelectorAll<HTMLElement>(".sub")
 		.forEach((el) => bio.register(el));

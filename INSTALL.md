@@ -76,6 +76,16 @@ a large inset.
 
 ## 3. Bootstrap from client-side code
 
+Every material runs in a worker on an OffscreenCanvas. Create a worker entry that
+imports the same registry:
+
+```ts
+// bio.worker.ts
+import { startBioWorker } from '@biomorphic/ca-core';
+import { materials } from './materials';
+startBioWorker(materials);
+```
+
 ```ts
 import { createBio } from '@biomorphic/ca-core';
 import { materials as flora } from '@biomorphic/ca-flora';
@@ -85,10 +95,15 @@ const bio = createBio({
   materials: { ...flora, ...goo }, // drop goo if you do not ship it
   material: 'spikes',
   seed: 1,
+  worker: () => new Worker(new URL('./bio.worker.ts', import.meta.url), { type: 'module' }),
 });
 
 bio.scan(); // register every [data-bio], .bio on the page
 ```
+
+The factory may be called more than once (the runtime pools workers, at most 4
+WebGL contexts each). Tree groups share one worker so their cross-group occupancy
+map is shared. Browsers without `transferControlToOffscreen` are not supported.
 
 If you only use `spikes`/`tree`, import only `@biomorphic/ca-flora`; that
 avoids loading the goo backend and its wasm asset.
@@ -105,7 +120,11 @@ Tear down in the same lifecycle (`bio.destroy()`), including HMR/unmount paths,
 so canvases and animation loops do not accumulate:
 
 ```ts
-const bio = createBio({ materials: flora, material: 'spikes' });
+const bio = createBio({
+	materials: flora,
+	material: 'spikes',
+	worker: () => new Worker(new URL('./bio.worker.ts', import.meta.url), { type: 'module' }),
+});
 bio.scan();
 return () => bio.destroy();
 ```

@@ -197,7 +197,11 @@ content above the left box. grow me and the box below is pushed down.</textarea
 			import { createBio } from "@biomorphic/ca-core";
 			import { materials } from "../materials";
 
-			const bio = createBio({ materials, material: "spikes" });
+			const bio = createBio({
+				materials,
+				material: "spikes",
+				worker: () => new Worker(new URL("../lib/bio.worker.ts", import.meta.url), { type: "module" }),
+			});
 			bio.scan();
 
 			// count resets per group so the isolation is visible, not just claimed

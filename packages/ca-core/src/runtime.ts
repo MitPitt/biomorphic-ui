@@ -1,11 +1,12 @@
-import { CAEngine } from './engine';
-import type { ActivityMode, Material, MaterialRegistry, Occupancy, UpsampleMode } from './types';
+import type { BioEngine } from './engine-api';
+import { canUseOffscreen, OffscreenEngine } from './offscreen';
+import type { ActivityMode, Material, MaterialRegistry, UpsampleMode } from './types';
 
 /**
  * createBio — the framework-agnostic runtime.
  *
- * Owns one `CAEngine` **per group** and a registry of the elements that seed each
- * group's field. A "group" is the set of elements whose growth is intentionally
+ * Owns one worker-backed `OffscreenEngine` **per group** and a registry of the
+ * elements that seed each group's field. A "group" is the set of elements whose growth is intentionally
  * coupled into one simulation grid (e.g. the goo fluid, or a crevice pair). Two
  * elements that must not couple — and must survive each other's reflow — belong to
  * different groups, so moving one never rebuilds the other.
@@ -69,6 +70,15 @@ export interface CreateBioOptions {
 	 * effective minimum cell. Lower it to trade sim detail for speed/memory.
 	 */
 	cellBudget?: number;
+	/**
+	 * Worker factory. Every material (shader or live) runs in a worker on an
+	 * OffscreenCanvas, so the page's main thread only measures rects and glyph
+	 * masks. The factory may be called several times (a worker holds at most a few
+	 * WebGL contexts) and must bundle `startBioWorker` with the same material
+	 * registry. Required: browsers without `transferControlToOffscreen` are not
+	 * supported.
+	 */
+	worker: () => Worker | null;
 }
 
 export interface RegisterOptions {
@@ -79,7 +89,7 @@ export interface RegisterOptions {
 
 export interface Bio {
 	/** The engine backing a group (default group when omitted). */
-	engine(group?: string): CAEngine | undefined;
+	engine(group?: string): BioEngine | undefined;
 	/** Group ids currently alive. */
 	groups(): string[];
 	/** Register an element as substrate for a group (creates the group on demand). */
@@ -121,7 +131,7 @@ type Rect = [number, number, number, number];
 
 interface GroupState {
 	id: string;
-	engine: CAEngine;
+	engine: BioEngine;
 	canvas: HTMLCanvasElement;
 	targets: Map<HTMLElement, ActivityMode>;
 	/** Last-seen document rect per target, for translation-aware reflow detection. */
@@ -130,17 +140,6 @@ interface GroupState {
 	dirty: boolean;
 	ro: ResizeObserver | null;
 	pending: number;
-}
-
-/** Small deterministic PRNG (mulberry32) so rebuilds reproduce exactly. */
-function mulberry32(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) | 0;
-		let t = Math.imul(a ^ (a >>> 15), 1 | a);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
 }
 
 function hashStr(s: string): number {
@@ -182,7 +181,12 @@ function rectOf(el: HTMLElement): Rect {
 	];
 }
 
+let bioSeq = 0;
+
 export function createBio(opts: CreateBioOptions): Bio {
+	if (!opts.worker) throw new Error('[bio] createBio requires a worker factory');
+	if (!canUseOffscreen()) throw new Error('[bio] OffscreenCanvas + web workers are required');
+	const bioId = `bio-${++bioSeq}`;
 	const registry = opts.materials;
 	const baseSeed = opts.seed ?? 0x1234abcd;
 	const defaultMaterial = opts.material ?? Object.keys(registry)[0] ?? 'spikes';
@@ -191,12 +195,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 	const groups = new Map<string, GroupState>();
 	/** element -> group id, so unregister/setMode can find the owning group. */
 	const owner = new Map<HTMLElement, string>();
-	/**
-	 * One document-grid tissue map shared by every engine, so independent live
-	 * sims (tree) don't grow through each other's branches. Sized to the first
-	 * engine's grid; group ids map to stable non-zero tokens.
-	 */
-	const occupancy: Occupancy = { w: 0, h: 0, owner: new Int32Array(0) };
+	/** Group ids map to stable non-zero tokens for the worker's shared tissue map. */
 	const tokens = new Map<string, number>();
 	let primaryId: string | null = opts.primary ?? null;
 	/** Current page-wide material (set by `setMaterial(id)` with no group). */
@@ -286,6 +285,36 @@ export function createBio(opts: CreateBioOptions): Bio {
 		});
 	};
 
+	// A single worker can only hold a few live WebGL contexts before Chrome
+	// silently loses the oldest ones, so spread groups across a small pool. Live
+	// tissue materials (tree) must all share ONE worker to share the occupancy
+	// map, so they get a sticky worker of their own.
+	const MAX_GROUPS_PER_WORKER = 4;
+	const workerSlots: Array<{ worker: Worker; load: number }> = [];
+	let stickyWorker: Worker | null = null;
+	let stickyLoad = 0;
+	const makeWorker = (): Worker => {
+		const worker = opts.worker();
+		if (!worker) throw new Error('[bio] worker factory returned null');
+		return worker;
+	};
+	const getWorker = (material: Material): Worker => {
+		if (material.usesOccupancy) {
+			if (!stickyWorker) stickyWorker = makeWorker();
+			if (++stickyLoad > MAX_GROUPS_PER_WORKER) {
+				console.warn('[bio] more than 4 live-tissue groups share a worker; WebGL contexts may be lost');
+			}
+			return stickyWorker;
+		}
+		let slot = workerSlots.find((s) => s.load < MAX_GROUPS_PER_WORKER);
+		if (!slot) {
+			slot = { worker: makeWorker(), load: 0 };
+			workerSlots.push(slot);
+		}
+		slot.load++;
+		return slot.worker;
+	};
+
 	const ensure = (id: string, materialId?: string): GroupState => {
 		const found = groups.get(id);
 		if (found) return found;
@@ -304,9 +333,9 @@ export function createBio(opts: CreateBioOptions): Bio {
 			dirty: false,
 			ro: null,
 			pending: 0,
-			engine: undefined as unknown as CAEngine,
+			engine: undefined as unknown as BioEngine,
 		};
-		state.engine = new CAEngine(canvas, material, {
+		const engineOpts = {
 			targets: () => Array.from(state.targets, ([el, mode]) => ({ el, mode })),
 			// every element owned by a *different* group is an inert obstacle here
 			// (hooks into `owner`, which later gets the new element's own entry).
@@ -322,13 +351,15 @@ export function createBio(opts: CreateBioOptions): Bio {
 						return out;
 					}
 				: undefined,
-			// live tissue sharing (tree): independent groups avoid each other's branches
-			occupancy: collideNeighbors ? occupancy : undefined,
-			token: collideNeighbors ? tokenFor(id) : 0,
 			neighborAura: collideNeighbors ? (opts.neighborAura ?? 0) : 0,
 			maxCells: opts.cellBudget,
-			rand: mulberry32((baseSeed ^ hashStr(id)) >>> 0),
-		});
+			seed: (baseSeed ^ hashStr(id)) >>> 0,
+			bioId,
+			token: collideNeighbors ? tokenFor(id) : 0,
+			collideNeighbors,
+		};
+		const worker = getWorker(material);
+		state.engine = new OffscreenEngine(canvas, material, { ...engineOpts, worker, id });
 		if (opts.params) Object.assign(state.engine.params, opts.params);
 		if (opts.speed !== undefined) state.engine.speed = opts.speed;
 		if (opts.cellSize !== undefined) state.engine.cellSize = opts.cellSize;
@@ -456,7 +487,18 @@ export function createBio(opts: CreateBioOptions): Bio {
 		}
 	};
 
-	const onWindowResize = (): void => forEachGroup(undefined, (g) => { g.dirty = false; g.engine.resize(); });
+	// Mobile URL bars/toolbars fire `resize` as they slide in and out on scroll.
+	// That changes the viewport height but not the document layout, so only
+	// rebuild when the fitted grid really changed (a width/orientation change),
+	// never on a browser-chrome height change.
+	const onWindowResize = (): void => forEachGroup(undefined, (g) => {
+		if (g.engine.refit()) {
+			g.dirty = false;
+			// the refit already re-rasterized against the current layout; sync the
+			// cached rects so the document observer's follow-up diff is a no-op
+			refreshRects(g);
+		}
+	});
 	// a document reflow (content above moves) may not resize any target individually;
 	// the documentElement observer catches it, then the rect diff decides which groups
 	// are actually affected.
@@ -503,6 +545,10 @@ export function createBio(opts: CreateBioOptions): Bio {
 			}
 			groups.clear();
 			owner.clear();
+			for (const s of workerSlots) s.worker.terminate();
+			workerSlots.length = 0;
+			stickyWorker?.terminate();
+			stickyWorker = null;
 		},
 	};
 }

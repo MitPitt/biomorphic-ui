@@ -281,6 +281,7 @@ export const spikes: Material = {
 	name: 'Spikes',
 	sim: SIM,
 	resolve: RESOLVE,
+	animated: (p) => p.style === 1 || p.style === 2,
 	speed: 2,
 	seed,
 	// The reach field is finite: seed budgets grow by 1/tick up to ~1.4*height, and

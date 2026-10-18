@@ -164,6 +164,6 @@
       clobbered the rest. Instances now live in a module `Set` and share one
       `GPUDevice` (a module-level `sharedDevice()` promise). The wasm path is
       likewise per-handle (`generation`/`sharedSim` globals removed); each handle
-      owns and frees its `GooSim`. `CAEngine.reset()` disposes the previous
+      owns and frees its `GooSim`. `GLEngine.reset()` disposes the previous
       `LiveHandle` (`LiveHandle.dispose`) before starting the next, which keeps GPU
       buffers / wasm sims from leaking on every reset.
