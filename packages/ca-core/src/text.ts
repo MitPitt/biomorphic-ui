@@ -40,6 +40,8 @@ interface Glyph {
 	ascent: number;
 	descent: number;
 	font: string;
+	/** Glyph scale that makes the canvas font match the rendered line box (mobile text autosizing). */
+	k: number;
 }
 
 const cache = new WeakMap<HTMLElement, TextMask>();
@@ -129,7 +131,8 @@ function glyphsOf(el: HTMLElement, x: number, y: number): { glyphs: Glyph[]; key
 						key = Math.imul(key, 16777619);
 						key ^= Math.round(r.height * 10);
 						key = Math.imul(key, 16777619);
-						glyphs.push({ ch, x: gx, top, lineHeight: r.height, ascent, descent, font });
+						const k = Math.min(2.5, Math.max(0.75, r.height / Math.max(1, ascent + descent)));
+						glyphs.push({ ch, x: gx, top, lineHeight: r.height, ascent, descent, font, k });
 					}
 				}
 				i = next;
@@ -184,8 +187,14 @@ export function textMaskOf(el: HTMLElement, x: number, y: number, w: number, h: 
 				ctx.font = g.font;
 				font = g.font;
 			}
-			const baseline = g.top + (g.lineHeight - (g.ascent + g.descent)) / 2 + g.ascent;
-			ctx.fillText(g.ch, g.x * scale, baseline * scale);
+			const ascent = g.ascent * g.k;
+			const descent = g.descent * g.k;
+			const baseline = g.top + (g.lineHeight - (ascent + descent)) / 2 + ascent;
+			ctx.save();
+			ctx.translate(g.x * scale, baseline * scale);
+			ctx.scale(g.k, g.k);
+			ctx.fillText(g.ch, 0, 0);
+			ctx.restore();
 		}
 		try {
 			mask.data = ctx.getImageData(0, 0, pw, ph).data;

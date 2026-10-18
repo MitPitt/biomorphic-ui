@@ -52,7 +52,10 @@
   (multiples of 45°) even when the driving normal is arbitrary (verified: a 30°
   normal yields a 45° tip). Fix = concentric shells of longer offsets
   (`reach.ts`), tunable via `growth directions` (8→48, default 28 ≈ 22.5° steps,
-  48 ≈ 15°). Cost model is `len * (max(fwd,0) + side*sharp)`; the first 8 offsets
+  48 ≈ 15°). The GLSL stencil is generated **arithmetically** from
+  `dx*dx+dy*dy <= cutoff` (the `snapDirs` shells are exactly the `d2` prefixes);
+  do not replace it with a `const ivec2[48]` + dynamic index — some Android GLES
+  compilers miscompile that and fall back to 8-direction (45°) growth on device. Cost model is `len * (max(fwd,0) + side*sharp)`; the first 8 offsets
   reproduce the old behaviour exactly. **A concave (pinched) width profile is
   unreachable** — no `sharp(p)` curve yields it (verified: every profile is convex
   or straight; width is monotonic outward). `curve` is therefore a base-width dial:

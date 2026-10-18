@@ -1,6 +1,5 @@
 import { DIRS, normalField, T, wrapFragment } from '@biomorphic/ca-core';
 import type { Material, SeedCtx } from '@biomorphic/ca-core';
-import { reachOffsetsGLSL, SNAP_DIRS_GLSL } from './reach';
 
 /**
  * SPIKES — stalagmites as a continuous reach field.
@@ -36,8 +35,6 @@ uniform float u_dirs;
 in vec2 v_uv;
 out vec4 outColor;
 
-${reachOffsetsGLSL()}
-
 void main() {
 	ivec2 P = ivec2(gl_FragCoord.xy);
 	vec4 self = fetchAt(u_state, P);
@@ -57,27 +54,36 @@ void main() {
 	float sharpness = u_sharpness;
 	float crv = u_curve;
 	float cut = hgt * 1.6 + 8.0;      // finite support -> the field converges
-	${SNAP_DIRS_GLSL}
+	// Same stencil as reach.ts' shells, generated arithmetically: dynamic indexing
+	// of a large const ivec2 array is miscompiled by some mobile GLES drivers.
+	int n = int(u_dirs + 0.5);
+	int cutoff = n <= 8 ? 2 : n <= 12 ? 4 : n <= 20 ? 5 : n <= 24 ? 8
+		: n <= 28 ? 9 : n <= 36 ? 10 : n <= 44 ? 13 : 16;
+	int R = cutoff <= 2 ? 1 : cutoff <= 4 ? 2 : cutoff <= 9 ? 3 : 4;
 	float best = -1e9;
-	for (int i = 0; i < n; i++) {
-		ivec2 off = OFFS[i];
-		vec4 nb = fetchAt(u_state, P + off);
-		if (int(nb.r + 0.5) == 1) continue;        // substrate blocks
-		if (nb.g < -cut) continue;                 // too far to matter
+	for (int dy = -R; dy <= R; dy++) {
+		for (int dx = -R; dx <= R; dx++) {
+			int d2 = dx * dx + dy * dy;
+			if (d2 == 0 || d2 > cutoff) continue;
+			ivec2 off = ivec2(dx, dy);
+			vec4 nb = fetchAt(u_state, P + off);
+			if (int(nb.r + 0.5) == 1) continue;        // substrate blocks
+			if (nb.g < -cut) continue;                 // too far to matter
 
-		float len = length(vec2(off));
-		vec2 u = -vec2(off) / len;                 // neighbour -> here (unit)
-		float fwd = dot(u, nrm);
-		if (fwd < -0.1) continue;                  // never flow back toward the box
-		float side = abs(dot(u, tan));
+			float len = length(vec2(off));
+			vec2 u = -vec2(off) / len;                 // neighbour -> here (unit)
+			float fwd = dot(u, nrm);
+			if (fwd < -0.1) continue;                  // never flow back toward the box
+			float side = abs(dot(u, tan));
 
-		float prog = clamp(1.0 - nb.g / max(hgt, 1.0), 0.0, 1.0);
-		float sharp = sharpness * (1.0 + crv * (1.0 - prog));
-		sharp = max(sharp, 0.35);
-		float jit = 1.0 + u_roughness * (hash21(vec2(P) + vec2(19.3, 7.1)) * 2.0 - 1.0);
+			float prog = clamp(1.0 - nb.g / max(hgt, 1.0), 0.0, 1.0);
+			float sharp = sharpness * (1.0 + crv * (1.0 - prog));
+			sharp = max(sharp, 0.35);
+			float jit = 1.0 + u_roughness * (hash21(vec2(P) + vec2(19.3, 7.1)) * 2.0 - 1.0);
 
-		float cost = len * (max(fwd, 0.0) + side * sharp * jit);
-		best = max(best, nb.g - cost);
+			float cost = len * (max(fwd, 0.0) + side * sharp * jit);
+			best = max(best, nb.g - cost);
+		}
 	}
 	best = max(best, -cut - 1.0);
 	float outB = self.b;

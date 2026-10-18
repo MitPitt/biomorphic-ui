@@ -10,7 +10,9 @@
  * fills in the intermediate rays: the tip granularity drops from 45° to
  * ~atan(1/maxR). The offsets are ordered by squared length so that any prefix
  * is a symmetric, complete shell; `snapDirs` clamps a requested count down to
- * the nearest complete shell.
+ * the nearest complete shell. The Spikes shader regenerates the same set
+ * arithmetically (`dx*dx+dy*dy <= cutoff`) instead of indexing a const array,
+ * which some mobile GLES drivers miscompile.
  *
  * Shell counts: 8 (r1) → 12 (r2 axis) → 20 (knight) → 24 (r2 diag) →
  * 28 (r3 axis) → 36 (3,1) → 44 (3,2) → 48 (r4 axis).
@@ -38,14 +40,3 @@ export function snapDirs(n: number): number {
 	for (const s of SHELLS) if (n <= s) return s;
 	return SHELLS[SHELLS.length - 1];
 }
-
-/** The same stencil as a GLSL `const ivec2 OFFS[N] = ...` declaration. */
-export function reachOffsetsGLSL(): string {
-	const n = REACH_OFFSETS.length;
-	const items = REACH_OFFSETS.map(([x, y]) => `ivec2(${x},${y})`).join(', ');
-	return `const ivec2 OFFS[${n}] = ivec2[${n}](${items});`;
-}
-
-/** GLSL expression that clamps `u_dirs` down to a complete shell (mirrors snapDirs). */
-export const SNAP_DIRS_GLSL = `int n = int(u_dirs + 0.5);
-	n = n <= 8 ? 8 : n <= 12 ? 12 : n <= 20 ? 20 : n <= 24 ? 24 : n <= 28 ? 28 : n <= 36 ? 36 : n <= 44 ? 44 : 48;`;

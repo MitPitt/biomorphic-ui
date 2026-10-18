@@ -383,7 +383,13 @@ Package-specific detail lives next to the code — goo internals in
   The text mask is likewise capped at 4096 px per dimension (a tall text block × dpr can
   exceed the canvas limit and throw in `getImageData`), and a failed scene collection
   posts an empty reset while the state starts at the empty sentinel — so a scene/mask
-  failure clears the canvas instead of leaving the zero-state tint.
+  failure clears the canvas instead of leaving the zero-state tint. Spikes also generate
+  the reach stencil **arithmetically** (`d2 <= cutoff` over `dy,dx`) instead of dynamically
+  indexing a `const ivec2[48]`; some Android GLES compilers miscompile the latter, which
+  shows up on device as the bare 8-direction (45°) growth. Text masks scale each glyph by
+  the rendered line-box / font-metric ratio: Android font autosizing renders glyphs larger
+  than `getComputedStyle().fontSize`, so an unscaled canvas mask is a smaller copy of the
+  DOM text.
 - **Aliasing vs `boxBlur`; upsample filter.** `boxBlur` smooths the *growth-direction*
   field (it shapes spikes), not the rendered edge. The rendered edge quality is the blit's
   reconstruction of the resolve texture, so `engine.setUpsample(mode)` picks it (a
