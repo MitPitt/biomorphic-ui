@@ -422,6 +422,25 @@ h1.glyph-text {
 	padding: 6px 0 2px;
 }
 
+#config textarea {
+	width: 100%;
+	min-height: 140px;
+	resize: vertical;
+	font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+	color: var(--ink);
+	background: #0e1013;
+	border: 1px solid var(--line);
+	border-radius: 7px;
+	padding: 8px;
+	margin: 4px 0 6px;
+	box-sizing: border-box;
+}
+
+#config button {
+	width: 100%;
+}
+
+
 #legend {
 	display: flex;
 	gap: 10px;

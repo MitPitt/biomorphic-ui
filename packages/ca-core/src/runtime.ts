@@ -1,5 +1,5 @@
 import { CAEngine } from './engine';
-import type { ActivityMode, Material, MaterialRegistry, Occupancy } from './types';
+import type { ActivityMode, Material, MaterialRegistry, Occupancy, UpsampleMode } from './types';
 
 /**
  * createBio — the framework-agnostic runtime.
@@ -38,6 +38,12 @@ export interface CreateBioOptions {
 	seed?: number;
 	/** Params applied to every group's engine on creation. */
 	params?: Record<string, number>;
+	/** Sim steps per frame for every group; defaults to the material's `speed`. */
+	speed?: number;
+	/** Base cell size in CSS px (the cell budget may raise it); default 4. */
+	cellSize?: number;
+	/** How the resolve texture is upsampled to the canvas (look-only, default `linear`). */
+	upsample?: UpsampleMode;
 	/** Selector scanned by `scan()`; defaults to `[data-bio], .bio`. */
 	selector?: string;
 	/** Group the no-arg `engine()`/`setMaterial()` target; defaults the first registered. */
@@ -198,7 +204,12 @@ export function createBio(opts: CreateBioOptions): Bio {
 	/** True while a coupled material (goo) is active: every target shares one group. */
 	let coupled = !!registry[globalMaterialId]?.coupled;
 	/** Engine globals preserved across a coupling rebuild. */
-	const defaults: { speed?: number; seedChance?: number; cellSize?: number } = {};
+	const defaults: {
+		speed?: number;
+		seedChance?: number;
+		cellSize?: number;
+		upsample?: UpsampleMode;
+	} = {};
 
 	/** Stable non-zero token for a group id (0 is reserved for "free"). */
 	const tokenFor = (id: string): number => {
@@ -319,9 +330,13 @@ export function createBio(opts: CreateBioOptions): Bio {
 			rand: mulberry32((baseSeed ^ hashStr(id)) >>> 0),
 		});
 		if (opts.params) Object.assign(state.engine.params, opts.params);
+		if (opts.speed !== undefined) state.engine.speed = opts.speed;
+		if (opts.cellSize !== undefined) state.engine.cellSize = opts.cellSize;
+		if (opts.upsample !== undefined) state.engine.setUpsample(opts.upsample);
 		if (defaults.speed !== undefined) state.engine.speed = defaults.speed;
 		if (defaults.seedChance !== undefined) state.engine.seedChance = defaults.seedChance;
 		if (defaults.cellSize !== undefined) state.engine.cellSize = defaults.cellSize;
+		if (defaults.upsample !== undefined) state.engine.setUpsample(defaults.upsample);
 		groups.set(id, state);
 		if (typeof ResizeObserver !== 'undefined') {
 			// size changes of a target, and (separately) any document reflow, both
@@ -386,6 +401,7 @@ export function createBio(opts: CreateBioOptions): Bio {
 			defaults.speed ??= g.engine.speed;
 			defaults.seedChance ??= g.engine.seedChance;
 			defaults.cellSize ??= g.engine.cellSize;
+			defaults.upsample ??= g.engine.upsampleMode;
 			if (g.pending) cancelAnimationFrame(g.pending);
 			g.ro?.disconnect();
 			g.engine.dispose();

@@ -247,6 +247,15 @@ export class CAEngine {
 		}
 	}
 
+	/** The current upsample mode (the name for `setUpsample`). */
+	get upsampleMode(): UpsampleMode {
+		for (const [mode, n] of Object.entries(UPSAMPLE)) {
+			if (n === this.upsample) return mode as UpsampleMode;
+		}
+		return 'linear';
+	}
+
+
 	resize(): void {
 		this.fitCanvas();
 		this.reset();

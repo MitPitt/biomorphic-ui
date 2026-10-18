@@ -117,6 +117,51 @@ export function startDemo(): void {
 		}
 	};
 
+	// config json: the current panel state as createBio options, so a setting dialled
+	// in here can be pasted into another app. The demo uses createBio's default seed.
+	const configEl = document.getElementById("config") as HTMLDetailsElement | null;
+	const configOut = document.getElementById("config-json") as HTMLTextAreaElement | null;
+	const copyEl = document.getElementById("copy-config") as HTMLButtonElement | null;
+
+	const configJson = () => {
+		const params: Record<string, number> = {};
+		for (const p of engine.material.params) {
+			const v = engine.params[p.key];
+			if (typeof v === "number") params[p.key] = Number(v.toFixed(4));
+		}
+		return JSON.stringify(
+			{
+				material: engine.material.id,
+				seed: 0x1234abcd,
+				cellBudget: engine.maxCells,
+				cellSize: Number(engine.cellSize.toFixed(3)),
+				speed: engine.speed,
+				upsample: engine.upsampleMode,
+				params,
+			},
+			null,
+			2,
+		);
+	};
+	configEl?.addEventListener("toggle", () => {
+		if (configEl.open && configOut) configOut.value = configJson();
+	});
+	copyEl?.addEventListener("click", async () => {
+		const text = configJson();
+		if (configOut) configOut.value = text;
+		try {
+			await navigator.clipboard.writeText(text);
+			copyEl.textContent = "copied";
+		} catch {
+			configOut?.focus();
+			configOut?.select();
+			copyEl.textContent = "select + copy";
+		}
+		setTimeout(() => {
+			copyEl.textContent = "copy json";
+		}, 1200);
+	});
+
 	const CELL_MIN = 0.1;
 	const CELL_MAX = 12;
 	const cellFromSlider = (v: number) =>
